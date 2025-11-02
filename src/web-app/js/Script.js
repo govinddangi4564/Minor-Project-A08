@@ -20,6 +20,26 @@ function handleFiles(files) {
     simulateUpload(file);
 }
 
+// Foating button
+const scrollToTopBtn = document.getElementById("scrollToTopBtn");
+
+// Show button when user scrolls down
+window.addEventListener("scroll", () => {
+    if (window.scrollY > 200) {
+        scrollToTopBtn.classList.add("show");
+    } else {
+        scrollToTopBtn.classList.remove("show");
+    }
+});
+
+// Scroll to top when button clicked
+scrollToTopBtn.addEventListener("click", () => {
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+});
+
 // Auto open popup after 5 seconds
 setTimeout(() => {
     openPopup();
@@ -200,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
         valueElement.textContent = percentage;
 
         // 3. Update the badge text and color
-        badgeElement.classList.remove('badge-average', 'badge-good', 'badge-excellent');
+        badgeElement.classList.remove('badge-weak','badge-average', 'badge-good', 'badge-excellent');
 
         if (percentage === 0) {
             badgeElement.textContent = '';
@@ -284,10 +304,10 @@ features.forEach(feature => {
         if (videoSrc) {
             featureVideo.src = videoSrc;
             videoModal.style.display = 'flex';
-            
+
             // ADDED: Apply to both body and html element
-            document.body.style.overflow = 'hidden'; 
-            document.documentElement.style.overflow = 'hidden'; 
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
 
             featureVideo.play();
         }
@@ -299,8 +319,8 @@ closeVideo.addEventListener('click', () => {
     videoModal.style.display = 'none';
 
     // ADDED: Reset both elements
-    document.body.style.overflow = ''; 
-    document.documentElement.style.overflow = ''; 
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
 
     featureVideo.src = '';
 });
