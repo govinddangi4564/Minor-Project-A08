@@ -622,10 +622,10 @@ const featureVideo = document.getElementById('featureVideo');
 const closeVideo = document.getElementById('closeVideo');
 
 const videoMap = {
-    'AI-Powered Matching': './videos/ai_matching.mp4',
-    'Bias Mitigation': './videos/bias_mitigation.mp4',
-    'Explainable Results': './videos/explainable_results.mp4',
-    'Visual Reports': './videos/visual_reports.mp4'
+    'AI-Powered Matching': '../videos/ai_matching.mp4',
+    'Bias Mitigation': '../videos/bias_mitigation.mp4',
+    'Explainable Results': '../videos/explainable_results.mp4',
+    'Visual Reports': '../videos/visual_reports.mp4'
 };
 
 features.forEach(feature => {
