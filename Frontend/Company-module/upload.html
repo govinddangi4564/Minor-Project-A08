@@ -5,14 +5,14 @@
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Resume Intelligence | Resume Upload</title>
+  <title>Resume Upload | HireDrift</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <link rel="stylesheet" href="assets/css/styles.css" />
   <link rel="stylesheet" href="assets/css/upload.css" />
   <script>
     // Protect this page - redirect to login if not authenticated
     if (sessionStorage.getItem('isCompanyLoggedIn') !== 'true') {
-      window.location.href = 'Company-login.htm';
+      window.location.href = 'company-login.html';
     }
   </script>
   <script type="module" src="assets/js/app.js" defer></script>
@@ -22,16 +22,16 @@
 <body class="upload-page">
   <div class="app-layout">
     <aside class="sidebar">
-      <h1>Talent Intelligence</h1>
+      <h1>HireDrift</h1>
       <nav>
         <a class="nav-link" href="dashboard.html">📊 Dashboard</a>
         <a class="nav-link" href="jd.html">📝 JD Management</a>
         <a class="nav-link" href="upload.html">📁 Resume Upload</a>
         <a class="nav-link" href="shortlist.html">✅ Shortlist</a>
         <a class="nav-link" href="candidate.html">👤 Candidate Detail</a>
-        <a class="nav-link Company-Profile" href="Company-Profile.html">👤 Profile</a>
+        <a class="nav-link Company-Profile" href="company-profile.html">👤 Profile</a>
         <div class="sidebar-footer nav-link User-Section">
-          <a href="../Index.html"><i class="fas fa-arrow-left"></i> Back to User-Section</a>
+          <a href="../index.html"><i class="fas fa-arrow-left"></i> Back to User-Section</a>
         </div>
       </nav>
       <div class="theme-toggle">
@@ -139,7 +139,7 @@
     data-initial-message="Upload assistant ready. Ask me about parsing status or errors.">
     <header>
       <strong>Upload Helper</strong>
-      <span class="pill">Parsing Logs</span>
+      <span class="pill">Coming soon</span>
     </header>
     <div id="assistantBody" class="assistant-body"></div>
     <div class="assistant-input">

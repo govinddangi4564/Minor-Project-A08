@@ -1,6 +1,3 @@
-import API from '../../../config/api-endpoint.js';
-import { navigateTo, routes, logout } from '../../../src/utils/router.js';
-
 document.addEventListener('DOMContentLoaded', function () {
     /**
      * ============================================================================
@@ -10,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     if (sessionStorage.getItem('isCompanyLoggedIn') !== 'true') {
         // If not logged in, redirect to the login page
-        logout();
+        window.location.href = 'company-login.html';
         return; // Stop executing the rest of the script
     }
 
@@ -66,14 +63,14 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             // Update URL hash
-            history.pushState(null, null, '#' + targetTab);
+            history.pushState(null, null, `#${targetTab}`);
         });
     });
 
     // --- Handle initial tab from URL hash ---
     const currentHash = window.location.hash.substring(1);
     if (currentHash) {
-        const initialTab = document.querySelector('.nav-item[data-tab="' + currentHash + '"]');
+        const initialTab = document.querySelector(`.nav-item[data-tab="${currentHash}"]`);
         if (initialTab) {
             initialTab.click();
         }
@@ -82,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Show Message Function ---
     function showMessage(text, type = 'success') {
         messageDiv.textContent = text;
-        messageDiv.className = 'message ' + type;
+        messageDiv.className = `message ${type}`;
         messageDiv.classList.add('show');
 
         setTimeout(() => {
@@ -97,8 +94,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const companyName = document.getElementById('companyName').value.trim();
         const companyEmail = document.getElementById('companyEmail').value.trim();
         const companyWebsite = document.getElementById('companyWebsite').value.trim();
-        const companyAddress = document.getElementById('companyAddress').value.trim();
-        const companyDescription = document.getElementById('companyDescription').value.trim();
 
         // Validation
         if (!companyName || !companyEmail) {
@@ -110,39 +105,22 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // Backend Integration - Update Profile
-        const profileData = { 
-            companyName: companyName, 
-            companyEmail: companyEmail, 
-            companyWebsite: companyWebsite,
-            companyAddress: companyAddress,
-            companyDescription: companyDescription
-        };
-        const token = sessionStorage.getItem('companyAuthToken');
+        // TODO: Backend Integration - Update Profile
+        // const profileData = { companyName, companyEmail, companyWebsite /*, etc. */ };
+        // fetch('/api/company/profile', {
+        //     method: 'PUT',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //         'Authorization': `Bearer ${sessionStorage.getItem('companyAuthToken')}`
+        //     },
+        //     body: JSON.stringify(profileData)
+        // })
+        // .then(response => response.json())
+        // .then(data => showMessage('Profile updated successfully!'))
+        // .catch(err => showMessage('Update failed!', 'error'));
 
-        showMessage('Updating profile...', 'info');
-
-        fetch(API.company.profile, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(profileData)
-        })
-            .then(response => {
-                if (!response.ok) throw new Error('Update failed');
-                return response.json();
-            })
-            .then(data => {
-                showMessage('Profile updated successfully!');
-                // Update session data if needed
-                // sessionStorage.setItem('companyData', JSON.stringify(data));
-            })
-            .catch(err => {
-                console.error(err);
-                showMessage('Update failed!', 'error');
-            });
+        // Simulate saving profile
+        showMessage('Profile updated successfully!');
     });
 
     // --- Logo Preview ---
@@ -210,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function () {
             showMessage('Your subscription has been cancelled.', 'success');
             // Redirect to the plan selection page
             setTimeout(() => {
-                navigateTo(routes.home);
+                window.location.href = '../index.html';
             }, 1000); // Wait a moment for the user to see the message
         }
     });
@@ -233,39 +211,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // --- Populate Plan Information from localStorage ---
-    // --- Populate Plan Information ---
-    const PLAN_DETAILS = {
-        'Pro': { price: '₹ 999', resumes: '500 resumes', features: ['Unlimited JDs', 'AI Shortlisting', 'Priority Support'] },
-        'Agency': { price: '₹ 2499', resumes: '2000 resumes', features: ['Unlimited JDs', 'AI Shortlisting', 'Priority Support', '2000 Resumes'] },
-        'Hiring Sprint': { price: '₹ 5999', resumes: '6000 resumes', features: ['Everything in Agency', '3-month access', 'Peak hiring support'] }
-    };
-
-    function populatePlanDetails(backendPlanName) {
-        let planData = JSON.parse(localStorage.getItem('companyPlan'));
+    function populatePlanDetails() {
+        const planData = JSON.parse(localStorage.getItem('companyPlan'));
         const planContainer = document.getElementById('plan-card');
-
-        // If no local data but we have backend plan name, construct planData
-        if (!planData && backendPlanName && PLAN_DETAILS[backendPlanName]) {
-            const details = PLAN_DETAILS[backendPlanName];
-            planData = {
-                name: backendPlanName,
-                price: details.price,
-                resumes: details.resumes,
-                renewalDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                features: details.features
-            };
-            // Optionally save to localStorage to persist
-            localStorage.setItem('companyPlan', JSON.stringify(planData));
-        } else if (!planData && backendPlanName) {
-             // Fallback if plan name not in map
-             planData = {
-                name: backendPlanName,
-                price: 'Custom',
-                resumes: 'N/A',
-                renewalDate: 'N/A',
-                features: []
-            };
-        }
 
         if (planData && planContainer) {
             // Default values if planData is missing some fields
@@ -276,7 +224,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const features = planData.features || [];
 
             planContainer.querySelector('.plan-name').textContent = planName;
-            planContainer.querySelector('.price').innerHTML = `${planPrice} <span>/month</span>`;
+            planContainer.querySelector('.price').innerHTML = `${planPrice}<span>/month</span>`;
             planContainer.querySelector('.resume-count').textContent = resumeCount;
             planContainer.querySelector('.plan-expiry').textContent = `Your plan renews on ${renewalDate}.`;
 
@@ -290,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else if (planContainer) {
             // Handle case where there is no plan
             planContainer.querySelector('.plan-name').textContent = 'No Active Plan';
-            planContainer.querySelector('.price').innerHTML = `₹ 0 <span>/month</span>`;
+            planContainer.querySelector('.price').innerHTML = `₹ 0<span>/month</span>`;
             planContainer.querySelector('.resume-count').textContent = 'Please select a plan to start.';
             planContainer.querySelector('.plan-expiry').textContent = '';
             planContainer.querySelector('.features').innerHTML = '';
@@ -300,38 +248,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Fetch Profile Data on Load
-    function fetchProfile() {
-        const token = sessionStorage.getItem('companyAuthToken');
-        if (!token) return;
-
-        fetch(API.company.profile, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error('Failed to fetch profile');
-            })
-            .then(data => {
-                if (data) {
-                    document.getElementById('companyName').value = data.companyName || '';
-                    document.getElementById('companyEmail').value = data.companyEmail || '';
-                    document.getElementById('companyWebsite').value = data.companyWebsite || '';
-                    document.getElementById('companyAddress').value = data.companyAddress || '';
-                    document.getElementById('companyDescription').value = data.companyDescription || '';
-                    
-                    // Update plan details if available
-                    if (data.plan) {
-                        populatePlanDetails(data.plan);
-                    }
-                }
-            })
-            .catch(err => console.error('Error fetching profile:', err));
-    }
-
     // Call it once on page load
     populatePlanDetails();
-    fetchProfile();
 
     // --- Modal Handling ---
     function openModal(modal) {
@@ -369,6 +287,9 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
         openModal(twoFactorModal);
 
+        // Add event listener for the new close button
+        twoFactorModal.querySelector('.close-modal-btn').addEventListener('click', closeModal);
+
         // Add form submission logic for 2FA
         document.getElementById('2faForm').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -382,10 +303,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Add event listeners to all close buttons and the overlay
-    document.querySelectorAll('.close-modal-btn, .modal-overlay').forEach(el => {
-        el.addEventListener('click', closeModal);
-    });
+    // Add event listener for the overlay to close modals
+    modalOverlay.addEventListener('click', closeModal);
 
     // Prevent modal clicks from closing the modal
     document.querySelectorAll('.modal').forEach(modal => {
@@ -408,7 +327,7 @@ function handleLogout() {
         sessionStorage.removeItem('isCompanyLoggedIn');
         sessionStorage.removeItem('companyAuthToken'); // Also remove the token
         // Redirect to login page
-        logout();
+        window.location.href = 'company-login.html';
     }
 }
 

@@ -1,11 +1,11 @@
 /* Dark Mode */
 .dark {
-  background-color: #161b1b;
+  background-color: #0f172a;
   color: white;
   transition: background-color 1s, color 0.3s;
 
   header {
-    background-color: #7c7050;
+    background-color: #5d697c;
     transition: background-color 1s, color 0.3s;
   }
 
@@ -16,25 +16,25 @@
   }
 
   .hero {
-    background-color: #665a4bc9;
+    background-color: #39475e;
     color: #fff;
     transition: background-color 1s, color 0.3s;
   }
 
   .feature {
-    background: rgb(47, 47, 42);
+    background: #1e293b;
     transition: transform 0.3s;
   }
 
   .upload-area {
-    background: rgb(47, 47, 42);
+    background: #1e293b;
     box-shadow: 0 0.2px 15px white;
   }
 
   textarea,
   input[type="text"],
   input[type="email"] {
-    background: rgb(47, 47, 42);
+    background: #1e293b;
     color: #fff;
   }
   button.submit-btn,
@@ -44,12 +44,12 @@
     color: white;
   }
   .result-box {
-    background: rgb(47, 47, 42);
+    background: #1e293b;
     border: 1px solid white;
     box-shadow: 0 2px 10px rgba(109, 102, 102, 0.626);
   }
   .results-card {
-    background-color: rgb(47, 47, 42);
+    background-color: #1e293b;
     color: #fff;
     box-shadow: 0 10px 15px -3px rgba(159, 150, 150, 0.1),
       0 4px 6px -2px rgba(245, 176, 176, 0.05);
@@ -65,8 +65,23 @@
   .upload-logo,
   .feature-text p,
   section p.sub,
-  .file-list {
+  .file-list,
+  .problem-card ul,
+  .solution-card ul,
+  .section-title,
+  .feature-title,
+  .timeline-title,
+  .progress-label,
+  .stat-card p{
     color: #fff;
+  }
+
+  .stat-number{
+    color: #ffd500;
+  }
+
+  .stat-label{
+    color: #c3c6b3;
   }
 
   .detail-value {
@@ -74,14 +89,15 @@
     color: #a5dcde;
   }
 
-  .Ex_feature {
-    background: rgb(47, 47, 42);
+  .Ex_feature,
+  .problem-card,
+  .solution-card,
+  .feature-card,
+  .timeline-content,
+  .step, 
+  .stat-card {
+    background: #1e293b;
     box-shadow: 0 2px 6px rgba(208, 186, 186, 0.15);
-  }
-
-  .step {
-    background: rgb(47, 47, 42);
-    box-shadow: 0 4px 10px rgba(213, 168, 168, 0.197);
   }
 
   .step h3,
@@ -106,6 +122,20 @@
   .feature:hover {
     transform: translateY(-5px);
     box-shadow: 0 15px 30px rgba(174, 155, 155, 0.15);
+  }
+
+  #why-choose {
+    color: #ffd500;
+  }
+
+  #intro {
+    color: #eaeff2;
+  }
+
+  .feature-description,
+  .timeline-description,
+  .cta-section {
+    color: #bbb5b5;
   }
 }
 

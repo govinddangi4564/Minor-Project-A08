@@ -12,21 +12,26 @@ nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 20px;
+  padding: 5px 2px;
   position: relative;
+  padding-top: 0px;
+  padding-bottom: 0px;
   /* Needed for positioning the mobile menu */
 }
 
 .name-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  padding-top: 0px;
+  margin-left: 20px;
 }
 
 h2.name {
   /* Targeting your h2 tag */
   font-size: 30px;
   font-weight: bold;
+  padding-top: 12px;
+  margin-left: 15px;
 }
 
 .logo img {

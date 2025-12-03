@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSkills(currentUser.skills || []);
         } else {
             alert('You are not logged in. Redirecting to home page.');
-            window.location.href = '../Index.html';
+            window.location.href = '../index.html';
         }
     }
 
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Redirect to home/login
-        window.location.href = '../Index.html';
+        window.location.href = '../index.html';
     }
 
     if (logoutButton) {
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm('Are you sure you want to delete your account? This action is irreversible.')) {
             sessionStorage.removeItem('googleUser');
             alert('Account deleted successfully (demo)!');
-            window.location.href = '../Index.html';
+            window.location.href = '../index.html';
         }
     });
 

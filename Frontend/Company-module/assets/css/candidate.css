@@ -129,7 +129,7 @@
 }
 
 .candidate-page .score-bar {
-  height: 8px;
+  height: 10px;
   background: var(--border);
   border-radius: 4px;
   overflow: hidden;
@@ -140,6 +140,14 @@
   background: var(--primary);
   border-radius: 4px;
   transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+}
+.score-fill {
+  font-size: 12px;
+  padding-left: 5px;
+  color: #929292;
+  font-weight: 700;
 }
 
 .candidate-page .skills-analysis {

@@ -1,191 +1,69 @@
-import { getStoredData, STORAGE_KEYS } from './data.js';
-import API from '../../../config/api-endpoint.js';
-import { logout } from '../../../src/utils/router.js';
-
-async function renderCandidateDetail() {
+function renderCandidateDetail() {
   const detailContainer = document.querySelector("#candidateDetail");
   if (!detailContainer) return;
 
   const params = new URLSearchParams(window.location.search);
-  let candidateId = params.get("id");
+  const candidateId = params.get("id");
+  const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
+  const candidate = candidates.find((c) => c.id === candidateId) || candidates[0];
 
-  const getToken = () => sessionStorage.getItem('companyAuthToken');
-  const token = getToken();
-
-  if (!token) {
-    logout();
+  if (!candidate) {
+    detailContainer.innerHTML = `<div class="empty-state"><strong>No candidate selected.</strong> Use the shortlist page to pick a profile.</div>`;
     return;
   }
 
-  // If no candidate ID provided, try to load last viewed or first candidate
-  if (!candidateId) {
-    // Try to get last viewed candidate
-    const lastViewedId = sessionStorage.getItem('lastViewedCandidateId');
+  // Get matched JD for additional context
+  const jds = getStoredData(STORAGE_KEYS.jds) || [];
+  const matchedJD = jds.find(jd => jd.id === candidate.matches?.jdId);
 
-    if (lastViewedId) {
-      candidateId = lastViewedId;
-      // Update URL without reload
-      window.history.replaceState({}, '', `?id=${candidateId}`);
-    } else {
-      // Fetch first candidate from API
-      try {
-        const response = await fetch(`${API.company.candidates.getAll}?limit=1`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+  // Analyze skills match
+  const matchedSkills = candidate.matches?.matchedSkills || [];
+  const unmatchedSkills = candidate.skills.filter(skill => !matchedSkills.includes(skill));
+  const highlightReason = matchedSkills.length
+    ? matchedSkills.slice(0, 2).join(" + ")
+    : "detected skill set";
 
-        if (response.ok) {
-          const candidates = await response.json();
-          if (candidates.length > 0) {
-            candidateId = candidates[0].id;
-            // Update URL without reload
-            window.history.replaceState({}, '', `?id=${candidateId}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching first candidate:', error);
-      }
-    }
-
-    // If still no candidate, show empty state
-    if (!candidateId) {
-      detailContainer.innerHTML = `<div class="empty-state"><strong>No candidates found.</strong> Upload resumes to get started.</div>`;
-      return;
-    }
+  // Generate insights
+  const insights = [];
+  if (candidate.matches?.finalScore >= 85) {
+    insights.push("Strong overall match for the role");
+  }
+  if (candidate.matches?.skillMatch >= 80) {
+    insights.push(`High skill alignment with ${matchedJD?.title || 'requirements'}`);
+  }
+  if (candidate.experience >= 5) {
+    insights.push("Senior level experience");
+  }
+  if (matchedSkills.length >= 4) {
+    insights.push("Diverse relevant skill set");
   }
 
-  // Remember this candidate as last viewed
-  sessionStorage.setItem('lastViewedCandidateId', candidateId);
+  // Calculate experience timeline
+  const experienceDate = new Date();
+  experienceDate.setFullYear(experienceDate.getFullYear() - candidate.experience);
+  const timeline = [];
+  for (let i = 0; i <= candidate.experience; i++) {
+    const year = experienceDate.getFullYear() + i;
+    timeline.push(year);
+  }
 
-  // Show loading state
-  detailContainer.innerHTML = `<div class="card" style="padding: 2rem; text-align: center;"><p>Loading candidate details...</p></div>`;
-
-  try {
-    // Fetch candidate data from API
-    const response = await fetch(API.company.candidates.get(candidateId), {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        logout();
-        return;
-      }
-      if (response.status === 404) {
-        // Candidate not found - clear last viewed and show empty state
-        sessionStorage.removeItem('lastViewedCandidateId');
-        detailContainer.innerHTML = `<div class="empty-state"><strong>Candidate not found.</strong> The candidate may have been deleted. <a href="shortlist.html">Go to shortlist</a> to view available candidates.</div>`;
-        return;
-      }
-      throw new Error('Failed to fetch candidate');
-    }
-
-    const candidate = await response.json();
-
-    if (!candidate) {
-      sessionStorage.removeItem('lastViewedCandidateId');
-      detailContainer.innerHTML = `<div class="empty-state"><strong>Candidate not found.</strong> <a href="shortlist.html">Go to shortlist</a> to view available candidates.</div>`;
-      return;
-    }
-
-    // Get specific match if jd_id is provided, otherwise get best match
-    const targetJdId = params.get("jd_id");
-    let selectedMatch = null;
-
-    if (candidate.matches && candidate.matches.length > 0) {
-      if (targetJdId) {
-        selectedMatch = candidate.matches.find(m => m.jd_id === targetJdId);
-      }
-      // Fallback to best match (first in array) if no specific JD requested or not found
-      if (!selectedMatch) {
-        selectedMatch = candidate.matches[0];
-      }
-    }
-
-    const bestMatch = selectedMatch; // Keep variable name for compatibility with rest of function
-
-    // Get matched JD for additional context (if available)
-    const jds = getStoredData(STORAGE_KEYS.jds) || [];
-    const matchedJD = jds.find(jd => jd.id === bestMatch?.jd_id || jd.id === bestMatch?.jdId);
-
-    // Analyze skills match
-    const matchedSkills = bestMatch?.matched_skills || bestMatch?.matchedSkills || [];
-    const allSkills = candidate.skills || [];
-    const unmatchedSkills = allSkills.filter(skill => !matchedSkills.includes(skill));
-    const highlightReason = matchedSkills.length
-      ? matchedSkills.slice(0, 2).join(" + ")
-      : "detected skill set";
-
-    // Generate insights
-    const insights = [];
-    const finalScore = bestMatch?.final_score || bestMatch?.finalScore || 0;
-    const skillMatch = bestMatch?.skill_match || bestMatch?.skillMatch || 0;
-    const experienceYears = candidate.experience_years || candidate.experience || 0;
-
-    if (finalScore >= 85) {
-      insights.push("Strong overall match for the role");
-    }
-    if (skillMatch >= 80) {
-      insights.push(`High skill alignment with ${matchedJD?.title || 'requirements'}`);
-    }
-    if (experienceYears >= 5) {
-      insights.push("Senior level experience");
-    }
-    if (matchedSkills.length >= 4) {
-      insights.push("Diverse relevant skill set");
-    }
-
-    // Calculate experience timeline
-    const experienceDate = new Date();
-    experienceDate.setFullYear(experienceDate.getFullYear() - experienceYears);
-    const timeline = [];
-    for (let i = 0; i <= experienceYears; i++) {
-      const year = experienceDate.getFullYear() + i;
-      timeline.push(year);
-    }
-
-    // Handle projects (could be array or string)
-    const projects = Array.isArray(candidate.projects)
-      ? candidate.projects
-      : (candidate.projects ? [candidate.projects] : []);
-
-    // Handle education (could be array or string)
-    let educationHtml = 'Not specified';
-    if (Array.isArray(candidate.education)) {
-      const filteredEdu = candidate.education
-        .filter(e => e && e.trim().length > 0 && !e.trim().match(/^[\s\u200B-\u200D\uFEFF•·-]+$/));
-
-      if (filteredEdu.length > 0) {
-        educationHtml = `
-          <ul class="education-list">
-            ${filteredEdu.map(e => `<li>${e.trim().replace(/^[•·-]\s*/, '')}</li>`).join('')}
-          </ul>
-        `;
-      }
-    } else if (candidate.education) {
-      educationHtml = candidate.education;
-    }
-
-    const sbertScore = bestMatch?.sbert_score || bestMatch?.sbertScore || 0;
-
-    detailContainer.innerHTML = `
+  detailContainer.innerHTML = `
     <section class="detail-grid">
       <div class="detail-section">
         <header class="candidate-header">
           <div>
             <h2>${candidate.name}</h2>
-            <p class="role">${candidate.role || candidate.primary_role || candidate.primaryRole || 'Not specified'}</p>
+            <p class="role">${candidate.primaryRole}</p>
           </div>
-          <div class="score-badge ${finalScore >= 85 ? 'high' : ''}">
-            ${finalScore}%
+          <div class="score-badge ${candidate.matches?.finalScore >= 85 ? 'high' : ''}">
+            ${candidate.matches?.finalScore || 0}%
             <span>Match</span>
           </div>
         </header>
 
-        <div class="summary-section">
+        <div class="summary-card">
           <h4>Professional Summary</h4>
-          <div class="summary-card">
-            <p>${candidate.summary || 'No summary available'}</p>
-          </div>
+          <p>${candidate.summary}</p>
         </div>
 
         <div class="experience-section">
@@ -198,43 +76,26 @@ async function renderCandidateDetail() {
               </div>
             `).join('')}
           </div>
-          ${experienceYears > 0 ? `<p class="experience-summary">${experienceYears} years total experience</p>` : ''}
-
-          <div class="experience-list-container" style="margin-top: 1.5rem;">
-            <h5>Experience Details</h5>
-            ${candidate.experience && Array.isArray(candidate.experience) && candidate.experience.length > 0
-            ? `<ul class="experience-list" style="list-style-type: disc; padding-left: 1.5rem; color: var(--text-secondary);">
-                  ${candidate.experience
-              .filter(e => e && e.trim().length > 0)
-              .map(e => `<li style="margin-bottom: 0.5rem;">${e.trim()}</li>`)
-              .join('')}
-                 </ul>`
-            : '<p style="color: var(--text-muted); font-style: italic;">No detailed experience listed.</p>'
-          }
-          </div>
+          <p class="experience-summary">${candidate.experience} years total experience</p>
         </div>
 
         <div class="education-section">
           <h4>Education</h4>
           <div class="education-card">
-            ${educationHtml}
+            ${candidate.education}
           </div>
         </div>
 
-        ${projects.length > 0 ? `
         <div class="projects-section">
           <h4>Key Projects</h4>
-          <div class="project-list-container">
-            <ul class="project-list">
-              ${projects
-          .filter(p => p && p.trim().length > 0 && !p.trim().match(/^[\s\u200B-\u200D\uFEFF•·-]+$/))
-          .map(project => `
-                  <li>${project.trim().replace(/^[•·-]\s*/, '')}</li>
-                `).join('')}
-            </ul>
+          <div class="project-cards">
+            ${candidate.projects.map(project => `
+              <div class="project-card">
+                <p>${project}</p>
+              </div>
+            `).join('')}
           </div>
         </div>
-        ` : ''}
       </div>
 
       <div class="detail-section">
@@ -243,30 +104,27 @@ async function renderCandidateDetail() {
           
           <div class="score-breakdown">
             <div class="score-item">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label style="margin: 0;">Overall Match</label>
-                <strong style="font-size: 18px; color: var(--primary);">${finalScore}%</strong>
-              </div>
+              <label>Overall Match</label>
               <div class="score-bar">
-                <div class="score-fill" style="width: ${finalScore}%"></div>
+                <div class="score-fill" style="width: ${candidate.matches?.finalScore || 0}%">
+                  ${candidate.matches?.finalScore || 0}%
+                </div>
               </div>
             </div>
             <div class="score-item">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label style="margin: 0;">Skill Match</label>
-                <strong style="font-size: 18px; color: var(--primary);">${skillMatch}%</strong>
-              </div>
+              <label>Skill Match</label>
               <div class="score-bar">
-                <div class="score-fill" style="width: ${skillMatch}%"></div>
+                <div class="score-fill" style="width: ${candidate.matches?.skillMatch || 0}%">
+                  ${candidate.matches?.skillMatch || 0}%
+                </div>
               </div>
             </div>
             <div class="score-item">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label style="margin: 0;">SBERT Score</label>
-                <strong style="font-size: 18px; color: var(--primary);">${sbertScore}</strong>
-              </div>
+              <label>SBERT Score</label>
               <div class="score-bar">
-                <div class="score-fill" style="width: ${sbertScore}%"></div>
+                <div class="score-fill" style="width: ${candidate.matches?.sbertScore || 0}%">
+                  ${candidate.matches?.sbertScore || 0}%
+                </div>
               </div>
             </div>
           </div>
@@ -274,7 +132,6 @@ async function renderCandidateDetail() {
           <div class="skills-analysis">
             <h4>Skills Breakdown</h4>
             <div class="skills-grid">
-              ${matchedSkills.length > 0 ? `
               <div>
                 <label>Matched Skills</label>
                 <div class="chip-group">
@@ -283,8 +140,6 @@ async function renderCandidateDetail() {
                   `).join('')}
                 </div>
               </div>
-              ` : ''}
-              ${unmatchedSkills.length > 0 ? `
               <div>
                 <label>Additional Skills</label>
                 <div class="chip-group">
@@ -293,21 +148,9 @@ async function renderCandidateDetail() {
                   `).join('')}
                 </div>
               </div>
-              ` : ''}
-              ${matchedSkills.length === 0 && unmatchedSkills.length === 0 && allSkills.length > 0 ? `
-              <div>
-                <label>Skills</label>
-                <div class="chip-group">
-                  ${allSkills.map(skill => `
-                    <span class="tag">${skill}</span>
-                  `).join('')}
-                </div>
-              </div>
-              ` : ''}
             </div>
           </div>
 
-          ${insights.length > 0 ? `
           <div class="ai-insights">
             <h4>AI Insights</h4>
             <ul class="insights-list">
@@ -316,7 +159,6 @@ async function renderCandidateDetail() {
               `).join('')}
             </ul>
           </div>
-          ` : ''}
 
           <div class="action-buttons">
             <button class="btn btn-primary" id="scheduleBtn">Schedule Interview</button>
@@ -327,50 +169,25 @@ async function renderCandidateDetail() {
     </section>
   `;
 
-    const downloadBtn = document.querySelector("#downloadResumeBtn");
-    downloadBtn?.addEventListener("click", async () => {
-      try {
-        const resumeResponse = await fetch(API.company.resumes.download(candidate.resume_id), {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!resumeResponse.ok) throw new Error('Failed to download resume');
+  const downloadBtn = document.querySelector("#downloadResumeBtn");
+  downloadBtn?.addEventListener("click", () => {
+    const link = document.createElement("a");
+    link.href = `resumes/${candidate.resumeFile}`;
+    link.download = candidate.resumeFile;
+    link.click();
+  });
 
-        const blob = await resumeResponse.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${candidate.name}_resume.pdf`;
-        link.click();
-        window.URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Error downloading resume:', error);
-        alert('Failed to download resume');
-      }
-    });
+  document.querySelectorAll("[data-action='schedule-interview']").forEach((button) => {
+    button.addEventListener("click", () => alert(`Interview slot request sent for ${candidate.name}`));
+  });
 
-    document.querySelectorAll("[data-action='schedule-interview']").forEach((button) => {
-      button.addEventListener("click", () => openScheduleModal(candidate));
-    });
+  document.querySelectorAll("[data-action='request-update']").forEach((button) => {
+    button.addEventListener("click", () => alert(`Requested updated resume from ${candidate.name}`));
+  });
 
-    document.querySelectorAll("[data-action='request-update']").forEach((button) => {
-      button.addEventListener("click", () => alert(`Requested updated resume from ${candidate.name}`));
-    });
-
-    document.querySelectorAll("[data-action='add-talent-pool']").forEach((button) => {
-      button.addEventListener("click", () => alert(`${candidate.name} added to talent pool.`));
-    });
-
-  } catch (error) {
-    console.error('Error loading candidate:', error);
-    sessionStorage.removeItem('lastViewedCandidateId');
-    detailContainer.innerHTML = `
-      <div class="empty-state">
-        <strong>Unable to load candidate details.</strong> 
-        <p>This may happen if there are no candidates in the system yet.</p>
-        <p><a href="upload.html">Upload resumes</a> to get started, or <a href="shortlist.html">view the shortlist</a>.</p>
-      </div>
-    `;
-  }
+  document.querySelectorAll("[data-action='add-talent-pool']").forEach((button) => {
+    button.addEventListener("click", () => alert(`${candidate.name} added to talent pool.`));
+  });
 }
 
 // Schedule Interview Modal
@@ -441,91 +258,44 @@ function openScheduleModal(candidate) {
     modal.remove();
   });
 
-  modal.querySelector('#scheduleForm').addEventListener('submit', async (e) => {
+  modal.querySelector('#scheduleForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const form = e.target;
-    
-    // Get form values
-    const interviewType = form.querySelector('select').value;
-    const date = form.querySelectorAll('input')[0].value;  // date input
-    const time = form.querySelectorAll('input')[1].value;  // time input
-    const duration = form.querySelectorAll('select')[1].value;
-    const interviewers = form.querySelector('input[placeholder*="email"]').value;
-    const notes = form.querySelector('textarea').value;
-    
-    // Parse interviewers (comma-separated emails)
-    const interviewersList = interviewers ? interviewers.split(',').map(e => e.trim()).filter(e => e) : [];
-    
-    try {
-      const token = sessionStorage.getItem('companyAuthToken');
-      const response = await fetch(API.company.interviews || 'http://localhost:8000/api/company/interviews/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          candidate_id: candidate.id,
-          interview_type: interviewType,
-          scheduled_date: date,
-          scheduled_time: time,
-          duration_minutes: parseInt(duration),
-          interviewers: interviewersList,
-          notes: notes || null
-        })
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to schedule interview');
-      }
-      
-      const result = await response.json();
-      alert(`✅ Interview scheduled successfully!\n\n📅 Date: ${date}\n⏰ Time: ${time}\n⏱️ Duration: ${duration} minutes\n\n${interviewersList.length > 0 ? '📧 Email invitations will be sent to:\n' + interviewersList.join(', ') : ''}`);
-      modal.remove();
-      
-      // Optionally refresh the candidate detail to show the scheduled interview
-      await renderCandidateDetail();
-    } catch (error) {
-      console.error('Error scheduling interview:', error);
-      alert(`❌ Failed to schedule interview: ${error.message}`);
-    }
+    // TODO: Integrate with calendar API
+    alert('Interview scheduled successfully! Calendar invites will be sent shortly.');
+    modal.remove();
   });
 
   setTimeout(() => modal.classList.add('active'), 10);
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
   if (!document.body.classList.contains("candidate-page")) return;
-  await renderCandidateDetail();
+  renderCandidateDetail();
 
   // Add event listeners after content is rendered
   const detailContainer = document.querySelector("#candidateDetail");
   if (!detailContainer) return;
 
   // Schedule Interview button
-  detailContainer.querySelector("#scheduleBtn")?.addEventListener("click", async () => {
+  detailContainer.querySelector("#scheduleBtn")?.addEventListener("click", () => {
     const params = new URLSearchParams(window.location.search);
     const candidateId = params.get("id");
+    const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
+    const candidate = candidates.find((c) => c.id === candidateId);
+    if (candidate) {
+      openScheduleModal(candidate);
+    }
+  });
 
-    if (!candidateId) return;
-
-    const getToken = () => sessionStorage.getItem('companyAuthToken');
-    const token = getToken();
-
-    try {
-      const response = await fetch(API.company.candidates.get(candidateId), {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch candidate');
-
-      const candidate = await response.json();
-      if (candidate) {
-        openScheduleModal(candidate);
-      }
-    } catch (error) {
-      console.error('Error fetching candidate for schedule:', error);
+  // Download Resume button
+  detailContainer.querySelector("#downloadResumeBtn")?.addEventListener("click", () => {
+    const params = new URLSearchParams(window.location.search);
+    const candidateId = params.get("id");
+    const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
+    const candidate = candidates.find((c) => c.id === candidateId);
+    if (candidate?.resumeFile) {
+      // TODO: Integrate with file storage API
+      alert(`Downloading resume: ${candidate.resumeFile}`);
     }
   });
 });

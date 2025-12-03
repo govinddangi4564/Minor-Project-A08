@@ -236,7 +236,7 @@ form textarea {
   background: var(--surface);
   color: var(--text);
   font-size: 14px;
-  min-width: 160px;
+  min-width: 80px;
 }
 
 form textarea {
@@ -912,7 +912,7 @@ tr:hover td {
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(45, 108, 223, 0.15);
-  color: var(--primary);
+  color: #666;
   font-size: 12px;
   font-weight: 600;
 }
