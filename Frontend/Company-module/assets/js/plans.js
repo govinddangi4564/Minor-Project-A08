@@ -1,3 +1,5 @@
+import { navigateTo, routes } from '../../../src/utils/router.js';
+
 // Plans page: save selected plan and redirect to registration page
 (function () {
     const selectButtons = document.querySelectorAll('.select-btn');
@@ -19,7 +21,7 @@
 
             localStorage.setItem('companyPlan', JSON.stringify(planData));
             setTimeout(() => {
-                window.location.href = './Company-Register.html';
+                navigateTo(routes.company.register);
             }, 2000);
         });
     });

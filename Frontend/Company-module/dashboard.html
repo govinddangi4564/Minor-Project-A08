@@ -16,9 +16,8 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script src="assets/js/data.js" defer></script>
-  <script src="assets/js/app.js" defer></script>
-  <script src="assets/js/dashboard.js" defer></script>
+  <script type="module" src="assets/js/app.js" defer></script>
+  <script type="module" src="assets/js/dashboard.js" defer></script>
 </head>
 
 <body class="dashboard-page">
@@ -121,32 +120,31 @@
         </section>
       </div>
 
-      <!-- Benchmarks Tab Content -->
       <div id="tab-benchmarks" class="tab-content">
         <section class="card-grid">
           <div class="card">
             <h3>Industry Benchmarks</h3>
-            <div class="metric">78%</div>
-            <div class="trend positive">Your average match score</div>
-            <p class="breadcrumbs">Industry average: 72%</p>
+            <div class="metric" id="benchmarkMatchScore">--</div>
+            <div class="trend positive" id="benchmarkMatchTrend">Your average match score</div>
+            <p class="breadcrumbs" id="benchmarkMatchIndustry">Industry average: --</p>
           </div>
           <div class="card">
             <h3>Time to Hire</h3>
-            <div class="metric">12 days</div>
-            <div class="trend positive">Average processing time</div>
-            <p class="breadcrumbs">Industry average: 18 days</p>
+            <div class="metric" id="benchmarkTimeToHire">--</div>
+            <div class="trend positive" id="benchmarkTimeTrend">Average processing time</div>
+            <p class="breadcrumbs" id="benchmarkTimeIndustry">Industry average: --</p>
           </div>
           <div class="card">
             <h3>Conversion Rate</h3>
-            <div class="metric">16.7%</div>
-            <div class="trend positive">Resume to shortlist</div>
-            <p class="breadcrumbs">Industry average: 12%</p>
+            <div class="metric" id="benchmarkConversionRate">--</div>
+            <div class="trend positive" id="benchmarkConversionTrend">Resume to shortlist</div>
+            <p class="breadcrumbs" id="benchmarkConversionIndustry">Industry average: --</p>
           </div>
           <div class="card">
             <h3>Quality Score</h3>
-            <div class="metric">8.5/10</div>
-            <div class="trend positive">Candidate quality rating</div>
-            <p class="breadcrumbs">Industry average: 7.2/10</p>
+            <div class="metric" id="benchmarkQualityScore">--</div>
+            <div class="trend positive" id="benchmarkQualityTrend">Candidate quality rating</div>
+            <p class="breadcrumbs" id="benchmarkQualityIndustry">Industry average: --</p>
           </div>
         </section>
 
@@ -230,11 +228,11 @@
             </header>
             <div class="card">
               <ul>
-                <li><button class="btn-link">📊 View Analytics Report</button></li>
-                <li><button class="btn-link">📈 View Trends Report</button></li>
-                <li><button class="btn-link">👥 View Department Report</button></li>
-                <li><button class="btn-link">📋 View Candidate Report</button></li>
-                <li><button class="btn-link">💾 Download CSV Export</button></li>
+                <li><button class="btn-link" id="viewAnalyticsReport">📊 View Analytics Report</button></li>
+                <li><button class="btn-link" id="viewTrendsReport">📈 View Trends Report</button></li>
+                <li><button class="btn-link" id="viewDepartmentReport">👥 View Department Report</button></li>
+                <li><button class="btn-link" id="viewCandidateReport">📋 View Candidate Report</button></li>
+                <li><button class="btn-link" id="downloadCSVExport">💾 Download CSV Export</button></li>
               </ul>
             </div>
           </div>
@@ -255,24 +253,9 @@
                   <th style="padding: 12px; text-align: left;">Actions</th>
                 </tr>
               </thead>
-              <tbody id="reportHistory">
+              <tbody id="reportHistoryTableBody">
                 <tr>
-                  <td style="padding: 12px;">Weekly Summary - Week 3</td>
-                  <td style="padding: 12px;">2025-01-20</td>
-                  <td style="padding: 12px;">Weekly</td>
-                  <td style="padding: 12px;">
-                    <button class="btn-link">View</button> |
-                    <button class="btn-link">Download</button>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 12px;">Monthly Analytics - January</td>
-                  <td style="padding: 12px;">2025-01-31</td>
-                  <td style="padding: 12px;">Monthly</td>
-                  <td style="padding: 12px;">
-                    <button class="btn-link">View</button> |
-                    <button class="btn-link">Download</button>
-                  </td>
+                  <td colspan="4" style="padding: 12px; text-align: center;">Loading...</td>
                 </tr>
               </tbody>
             </table>

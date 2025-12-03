@@ -1,3 +1,5 @@
+import API from '../../config/api-endpoint.js';
+
 // Drag & Drop Upload
 const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('fileInput');
@@ -13,20 +15,14 @@ uploadArea.addEventListener('drop', e => {
 });
 fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
-function handleFiles(files) {
+async function handleFiles(files) {
     if (!files.length) return;
     const file = files[0];
     fileList.innerHTML = `<p><strong>${file.name}</strong> (${Math.round(file.size / 1024)} KB)</p>`;
-    simulateUpload(file);
+    
+    // Real Upload
+    await uploadFile(file);
 }
-
-// Auto open popup after 5 seconds
-setTimeout(() => {
-    // Only open the popup if no user is currently logged in
-    if (!googleUser) {
-        openPopup();
-    }
-}, 5000);
 
 // Foating button
 const scrollToTopBtn = document.getElementById("scrollToTopBtn");
@@ -96,36 +92,229 @@ document.addEventListener('mouseup', () => {
 
 
 // Resume Text: Managed by backend NLP
-function simulateUpload(file) {
+async function uploadFile(file) {
     progress.style.width = '0%';
-    let percent = 0;
-    const interval = setInterval(() => {
-        percent += 10;
-        progress.style.width = percent + '%';
-        if (percent >= 100) {
-            clearInterval(interval);
-            document.getElementById('resumeText').value = `Uploaded file: ${file.name}\n(Note: Backend will extract text using NLP parser here.)`;
+    progress.style.transition = 'width 0.5s';
+    
+    // Show loading state
+    progress.style.width = '30%';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(API.public.parseResume, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error('Upload failed');
         }
-    }, 200);
+
+        progress.style.width = '70%';
+        const data = await response.json();
+        
+        // Fill the textarea with parsed text
+        document.getElementById('resumeText').value = data.text;
+        progress.style.width = '100%';
+        
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Failed to parse resume. Please try again.');
+        progress.style.width = '0%';
+    }
 }
 
-// Simple Resume Analysis Simulation
-function analyze() {
-    const jd = document.getElementById('jobDesc').value.toLowerCase();
-    const resume = document.getElementById('resumeText').value.toLowerCase();
-    if (!jd || !resume) { alert("Please enter both JD and Resume."); return; }
+// Real Resume Analysis
+window.analyze = async function() {
+    const jd = document.getElementById('jobDesc').value;
+    const resume = document.getElementById('resumeText').value;
+    
+    if (!jd || !resume) { 
+        alert("Please enter both JD and Resume (or upload a resume)."); 
+        return; 
+    }
 
-    const jdWords = jd.split(/\W+/).filter(w => w.length > 2);
-    const resumeWords = resume.split(/\W+/).filter(w => w.length > 2);
-    const matched = jdWords.filter(w => resumeWords.includes(w));
-    const score = Math.round((matched.length / jdWords.length) * 100);
+    const resultBox = document.getElementById('result');
+    resultBox.innerHTML = '<div class="spinner"></div> Analyzing...';
 
-    document.getElementById('result').innerHTML =
-        `<strong>Match Score:</strong> ${score}%<br><br>
-         <strong>Matched Skills:</strong> ${matched.join(', ') || 'None'}<br><br>
-         <strong>Remarks:</strong> ${score > 70 ? 'Highly Suitable' : score > 40 ? 'Moderately Suitable' : 'Needs Improvement'}`;
+    try {
+        const response = await fetch(API.public.analyze, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                resume_text: resume,
+                jd_text: jd
+            })
+        });
 
-    drawChart(score);
+        if (!response.ok) {
+            throw new Error('Analysis failed');
+        }
+
+        const data = await response.json();
+        
+        // Display Results
+        resultBox.innerHTML = `
+            <div class="analysis-results">
+                <div class="score-summary">
+                    <div class="main-score">
+                        <span class="score-label">Final Match Score</span>
+                        <span class="score-number ${getScoreClass(data.match_score)}">${data.match_score}%</span>
+                    </div>
+                    <div class="sub-scores">
+                        <div class="sub-score">
+                            <span>Skill Match:</span> <strong>${data.skill_match_score}%</strong>
+                        </div>
+                        <div class="sub-score">
+                            <span>Semantic Match (SBERT):</span> <strong>${data.sbert_score}%</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="skills-section">
+                    <h4>Skills Found in Resume</h4>
+                    <div class="tags">
+                        ${data.resume_skills.length ? data.resume_skills.map(s => `<span class="tag resume-skill">${s}</span>`).join('') : 'None detected'}
+                    </div>
+                </div>
+
+                <div class="skills-section">
+                    <h4>Missing Skills (from JD)</h4>
+                    <div class="tags">
+                        ${data.missing_skills.length ? data.missing_skills.map(s => `<span class="tag missing-skill">${s}</span>`).join('') : 'None! Good job.'}
+                    </div>
+                </div>
+
+                <div class="improvements-section">
+                    <h4>Suggested Improvements</h4>
+                    <ul>
+                        ${data.improvements.map(imp => `<li>${imp}</li>`).join('')}
+                    </ul>
+                </div>
+
+                <div class="email-action" style="text-align: center; margin-top: 30px;">
+                    <button id="sendReportBtn" class="submit-btn" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);">
+                        <i class="fa-solid fa-envelope"></i> Send Report to Email
+                    </button>
+                    <p id="emailStatus" style="margin-top: 10px; font-size: 14px;"></p>
+                </div>
+            </div>
+        `;
+
+        // Store the analysis data globally for email sending
+        window.currentAnalysis = data;
+
+        // Add event listener to send report button
+        const sendReportBtn = document.getElementById('sendReportBtn');
+        if (sendReportBtn) {
+            sendReportBtn.addEventListener('click', async () => {
+                await sendReportToEmail(data);
+            });
+        }
+
+        // Update Charts/Circles if they exist
+        // We can map our backend scores to the frontend circles for visual effect
+        // Impact -> Match Score
+        // Brevity -> Skill Match
+        // Style -> SBERT Score
+        // Soft Skills -> (Random or derived)
+        
+        if (window.setAllScores) {
+            window.setAllScores({
+                'impact-circle': Math.round(data.match_score),
+                'brevity-circle': Math.round(data.skill_match_score),
+                'style-circle': Math.round(data.sbert_score),
+                'soft-skills-circle': Math.round((data.match_score + data.sbert_score) / 2) // Approximation
+            });
+        }
+
+    } catch (error) {
+        console.error('Analysis error:', error);
+        resultBox.innerHTML = 'Error analyzing resume. Please try again.';
+    }
+}
+
+// Function to send report to user's email
+async function sendReportToEmail(analysisData) {
+    const sendReportBtn = document.getElementById('sendReportBtn');
+    const emailStatus = document.getElementById('emailStatus');
+
+    // Check if user is logged in
+    const googleUser = sessionStorage.getItem('googleUser');
+    
+    if (!googleUser) {
+        emailStatus.innerHTML = '<span style="color: #f44336;">❌ Please sign in to send report to email</span>';
+        // Open sign-in popup
+        if (window.openPopup) {
+            setTimeout(() => window.openPopup(), 1000);
+        }
+        return;
+    }
+
+    const user = JSON.parse(googleUser);
+    
+    if (!user.email) {
+        emailStatus.innerHTML = '<span style="color: #f44336;">❌ Email not found. Please sign in again.</span>';
+        return;
+    }
+
+    try {
+        // Disable button while sending
+        sendReportBtn.disabled = true;
+        sendReportBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+        emailStatus.innerHTML = '';
+
+        const response = await fetch(API.public.sendReport, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: user.email,
+                user_name: user.name || 'User',
+                match_score: analysisData.match_score,
+                sbert_score: analysisData.sbert_score,
+                skill_match_score: analysisData.skill_match_score,
+                resume_skills: analysisData.resume_skills,
+                matched_skills: analysisData.matched_skills,
+                missing_skills: analysisData.missing_skills,
+                improvements: analysisData.improvements
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to send email');
+        }
+
+        const data = await response.json();
+        
+        // Show success message
+        emailStatus.innerHTML = `<span style="color: #22c55e;">✅ ${data.message}</span>`;
+        sendReportBtn.innerHTML = '<i class="fa-solid fa-check"></i> Sent Successfully!';
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            sendReportBtn.disabled = false;
+            sendReportBtn.innerHTML = '<i class="fa-solid fa-envelope"></i> Send Report to Email';
+        }, 3000);
+
+    } catch (error) {
+        console.error('Email sending error:', error);
+        emailStatus.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
+        sendReportBtn.disabled = false;
+        sendReportBtn.innerHTML = '<i class="fa-solid fa-envelope"></i> Send Report to Email';
+    }
+}
+
+function getScoreClass(score) {
+    if (score >= 75) return 'score-high';
+    if (score >= 50) return 'score-medium';
+    return 'score-low';
 }
 
 document.addEventListener('DOMContentLoaded', () => {

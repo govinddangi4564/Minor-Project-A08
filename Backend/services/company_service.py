@@ -9,7 +9,7 @@ def login_company(db: Session, email: str, password: str):
     if not company or not verify_password(password, company.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     
-    token = create_access_token({"sub": str(company.id)})
+    token = create_access_token({"entity": str(company.id), "type": "company"})
     return {"token": token, "company": {"id": company.id, "name": company.name}}
 
 # Get profile
@@ -21,7 +21,11 @@ def get_company_profile(db: Session, company_id: str):
         "companyID": company.id,
         "companyName": company.name,
         "companyEmail": company.email,
-        "companyWebsite": company.website
+        "companyEmail": company.email,
+        "companyWebsite": company.website,
+        "companyAddress": company.location,
+        "companyDescription": company.description,
+        "plan": company.plan
     }
 
 # Update profile
@@ -33,13 +37,18 @@ def update_company_profile(db: Session, company_id: str, data: dict):
     company.name = data.get("companyName", company.name)
     company.email = data.get("companyEmail", company.email)
     company.website = data.get("companyWebsite", company.website)
+    company.location = data.get("companyAddress", company.location)
+    company.description = data.get("companyDescription", company.description)
     db.commit()
     db.refresh(company)
     return {
         "companyID": company.id,
         "companyName": company.name,
         "companyEmail": company.email,
-        "companyWebsite": company.website
+        "companyWebsite": company.website,
+        "companyAddress": company.location,
+        "companyDescription": company.description,
+        "plan": company.plan
     }
 
 # Change password
@@ -60,11 +69,21 @@ def change_password(db: Session, company_id: str, current_password: str, new_pas
 
 # Register company
 def register_company(db: Session, data: dict):
+    # Check if email already exists
+    existing_company = db.query(Company).filter(Company.email == data["email"]).first()
+    if existing_company:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail="Email already registered. Please try logging in instead."
+        )
+    
     company = Company(
         name=data['name'],
         email=data["email"],
         password=hash_password(data["password"]),
-        description=f"{data['plan']} plan",
+        description="",
+        plan=data['plan'],
+        website=data["website"]
     )
     db.add(company)
     db.commit()

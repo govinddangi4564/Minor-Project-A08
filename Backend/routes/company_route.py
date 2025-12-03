@@ -3,31 +3,16 @@ from sqlalchemy.orm import Session
 from models.base import get_db
 from schemas.company_schema import *
 from services.company_service import *
-from utils.security import decode_token
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from utils.security import get_authenticated_entity
 
-
-http_bearer = HTTPBearer()
 router = APIRouter()
 
 
-def get_current_company(creds: HTTPAuthorizationCredentials = Depends(http_bearer), db: Session = Depends(get_db)) -> Company:
-    token = creds.credentials
-    payload = decode_token(token)
-    try:
-        company_id: str = payload.get("sub")
-        if company_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: missing subject",
-            )
-    except Exception as e:
-        raise e
-
-    company = db.query(Company).filter(Company.id == company_id).first()
-    if not company:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
-    return company
+def get_current_company(auth: dict = Depends(get_authenticated_entity)):
+    entity, type = auth["entity"], auth["type"]
+    if type != "company":
+        raise HTTPException(401, "Invalid token")
+    return entity
 
 
 # Company login

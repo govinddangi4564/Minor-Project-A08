@@ -1,151 +1,118 @@
-API Endpoints:
+# AI Resume Screener Backend
 
-Company Specific:
+This is the backend service for the AI Resume Screener application. It provides APIs for resume parsing, job description management, candidate matching using SBERT (Sentence-BERT), and analytics dashboards.
 
-1. POST /api/auth/company/login
-    email, password
-    Response (200 OK):
-    {
-       "token": "your_jwt_token_here",
-        "company": { "id": "company-123", "name": "Innovate Inc." }
-     }
- 
-     Error Response (401 Unauthorized):
-     { "message": "Invalid credentials" }
- 
+## 🛠 Tech Stack
 
-2. GET /api/company/profile
-    return: companyID, companyName, companyEmail, companyWebsite
-    validate: companyAuthToken
-  - Fetches the current company's data to populate the form.
+-   **Framework**: [FastAPI](https://fastapi.tiangolo.com/)
+-   **Database**: [PostgreSQL](https://www.postgresql.org/)
+-   **ORM**: [SQLAlchemy](https://www.sqlalchemy.org/)
+-   **Migrations**: [Alembic](https://alembic.sqlalchemy.org/)
+-   **Package Manager**: [uv](https://github.com/astral-sh/uv)
+-   **AI/ML**: [Sentence-Transformers](https://www.sbert.net/) (SBERT) for semantic matching
+-   **PDF Parsing**: [PyMuPDF](https://pymupdf.readthedocs.io/)
+-   **Authentication**: JWT (JSON Web Tokens)
 
-3. PUT /api/company/profile
-    companyName, companyEmail, companyWebsite
-    validate: companyAuthToken
-    - Updates the company's profile data.
+## 🚀 Prerequisites
 
-4. POST /api/company/change-password
-    currentPassword, confirmPassword, currentPassword
-    validate: companyAuthToken
-    - Handles password changes.
+Ensure you have the following installed on your system:
 
-5. POST /api/companies/register
-    firstName, lastName, email, password, plan
+-   **Python 3.13+**
+-   **PostgreSQL** (running locally or accessible remotely)
+-   **uv** (fast Python package installer and resolver)
 
-6. /api/company/dashboard/stats
-    validate: companyAuthToken
-    response: 
-    {
-         resumes_scanned: 150,
-         shortlisted: 25,
-         avg_match_score: 78,
-         active_jds: 5,
-         trends: { 
-           weekly_growth: 12, 
-           conversion_rate: 8,
-           top_department: "Engineering",
-           top_skill: "Python"
-         }
-    }
+If you don't have `uv` installed, you can install it via curl or pip:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# or
+pip install uv
+```
 
-7. /api/company/dashboard/skills-distribution?days=7
-    { 
-       skills: [
-         { name: "Python", count: 45, percentage: 30 },
-         { name: "React", count: 32, percentage: 21 },
-         ...
-       ] 
-     }
+## 📥 Installation & Setup
 
-8. /api/company/dashboard/match-trends?days=7&jd_id=xxx
-    { 
-        trends: [
-        { date: "2025-01-15", avg_score: 85, shortlisted_count: 5, total_candidates: 12 },
-        { date: "2025-01-16", avg_score: 82, shortlisted_count: 3, total_candidates: 8 },
-        ...
-        ],
-        jd_breakdown: [
-        { jd_id: "jd-1", jd_title: "Full Stack Developer", daily_scores: [...] },
-        ...
-        ]
-    }
+1.  **Clone the repository**
+    ```bash
+    git clone <repository-url>
+    cd minor-project/backend
+    ```
 
+2.  **Install Dependencies**
+    Using `uv` to sync dependencies from `uv.lock` or `pyproject.toml`:
+    ```bash
+    uv sync
+    ```
+    This will create a virtual environment in `.venv` and install all required packages.
 
+3.  **Environment Configuration**
+    Create a `.env` file in the `backend` directory. You can copy the example below:
 
-JD specific:
+    ```ini
+    # Database Configuration
+    POSTGRES_DB = ai_resume_db
+    POSTGRES_USER = postgres_user
+    POSTGRES_PASSWORD = postgres_pass
+    POSTGRES_HOST = localhost
+    POSTGRES_PORT = 5432
 
-1. GET /api/jds
-    id, title, department, location, description,
-    keywords, created_at, updated_at, created_by
+    # Security
+    SECRET_KEY=your_super_secret_key_here
+    ALGORITHM=HS256
+    ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-2. GET /api/jds/:id
+    # Email Configuration (if applicable)
+    MAIL_USERNAME=your_email@example.com
+    MAIL_PASSWORD=your_email_password
+    MAIL_FROM=your_email@example.com
+    MAIL_PORT=587
+    MAIL_SERVER=smtp.gmail.com
+    ```
 
-3. POST   /api/jds
+4.  **Database Setup**
+    Make sure your PostgreSQL server is running and you have created the database mentioned in `DATABASE_URL`.
 
-4. PUT    /api/jds/:id
+    Run migrations to set up the schema:
+    ```bash
+    uv run alembic upgrade head
+    ```
 
-5. DELETE /api/jds/:id
+## 🏃‍♂️ Running the Application
 
+Start the development server using `uv`:
 
+```bash
+uv run uvicorn main:app --reload
+```
 
-Resumes
+The API will be available at `http://localhost:8000`.
 
-1. POST /api/resumes/parse
-    auth token
-    payload: multipart resume file in formData 'resume'
+## 📚 API Documentation
 
+FastAPI automatically generates interactive API documentation. Once the server is running, you can access:
 
+-   **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+-   **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-Shortlist
+## 📂 Project Structure
 
-1. GET  /api/shortlist
-    {candidateName}
+```
+backend/
+├── alembic/            # Database migration scripts
+├── models/             # SQLAlchemy database models
+├── routes/             # API route handlers
+├── schemas/            # Pydantic models for request/response validation
+├── services/           # Business logic and external services (AI, PDF parsing)
+├── utils/              # Utility functions
+├── uploads/            # Directory for storing uploaded resumes
+├── main.py             # Application entry point
+├── alembic.ini         # Alembic configuration
+├── pyproject.toml      # Project dependencies and config
+└── uv.lock             # Lock file for dependencies
+```
 
-2. POST  /api/shortlist 
-    candidateId, shortlisted, jdId
+## 🧪 Key Features
 
-3. DELETE /api/shortlist/:id
-
-
-
-Matching
-
-1. POST   /api/matching/run  
-    Run SBERT matching for all candidates
-
-2. POST   /api/matching/candidate/:id
-    Match single candidate
-
-3. POST   /api/matching/calculate  
-    candidate_id, jd_id, resume_text, jd_text
-
-
-
-Candidates:
-
-1. GET  /api/candidates?role=...&department=...&days=...&search=...&minScore=...&sortBy=...
-    jdId, jdTitle, department, uploadedAt, 
-
-2. GET  /api/candidates/:id
-
-3. POST /api/candidates
-
-4. PUT  /api/candidates/:id
-
-5. DELETE  /api/candidates/:id
-
-
-
-User Specific: (change /api to /api/user for all below endpoints)
-
-1. POST /api/forgot-password
-    payload: email => send reset link to email
-    response: {"message": "email sent"}
-
-2. POST /api/login
-    email, password
-    response: name, email, user_id, token, picture, fullName, phone, newsletter
-
-3. POST /api/register
-    payload: email, picture(optional), fullName, phone, newsletter, password
-    return the same data in response
+-   **Resume Parsing**: Extracts text and metadata from PDF resumes.
+-   **Job Description Management**: Create and manage JDs.
+-   **Semantic Matching**: Calculates similarity scores between candidates and JDs using SBERT.
+-   **Dashboard Analytics**: Visualizes hiring trends and statistics.
+-   **Shortlisting**: Manage candidate shortlists.

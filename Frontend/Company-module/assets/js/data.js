@@ -75,7 +75,7 @@
  * ============================================================================
  */
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   jds: "ats_hr_jds",           // TODO: Replace with API call to GET /api/jds
   candidates: "ats_hr_candidates", // TODO: Replace with API call to GET /api/candidates
   shortlist: "ats_hr_shortlist",   // TODO: Replace with API call to GET /api/shortlist
@@ -211,7 +211,7 @@ const defaultShortlist = {
  * SELECT COUNT(*) FROM job_descriptions WHERE created_by = :userId
  * ============================================================================
  */
-function initStorage() {
+export function initStorage() {
   // Use setStoredData to ensure events are triggered
   if (!localStorage.getItem(STORAGE_KEYS.jds)) {
     setStoredData(STORAGE_KEYS.jds, defaultJDs);
@@ -313,7 +313,7 @@ function initStorage() {
  * - Shortlist: SELECT * FROM shortlist WHERE user_id = :userId
  * ============================================================================
  */
-function getStoredData(key) {
+export function getStoredData(key) {
   // TODO: Replace with API call
   // Example: if (key === STORAGE_KEYS.jds) return await fetchJDs();
   const raw = localStorage.getItem(key);
@@ -397,15 +397,15 @@ function getStoredData(key) {
  * function instead of directly calling localStorage.setItem()
  * ============================================================================
  */
-function setStoredData(key, value) {
+export function setStoredData(key, value) {
   // TODO: Replace with API call
   // Example: if (key === STORAGE_KEYS.jds) return await saveJD(value);
   const oldValue = localStorage.getItem(key);
   localStorage.setItem(key, JSON.stringify(value));
   // Dispatch custom event for same-tab updates (use setTimeout to ensure it fires after storage is set)
   setTimeout(() => {
-    document.dispatchEvent(new CustomEvent("dataUpdated", { 
-      detail: { key, value, oldValue } 
+    document.dispatchEvent(new CustomEvent("dataUpdated", {
+      detail: { key, value, oldValue }
     }));
   }, 0);
 }
@@ -503,7 +503,7 @@ function tokenize(text) {
  * - Consider async processing for large candidate pools
  * ============================================================================
  */
-function calculateMatch(candidate, jd) {
+export function calculateMatch(candidate, jd) {
   // TODO: Replace with API call
   // const response = await fetch('/api/matching/calculate', {
   //   method: 'POST',
@@ -602,7 +602,7 @@ function calculateMatch(candidate, jd) {
  * NOTE: This function triggers a dashboard refresh automatically via setStoredData
  * ============================================================================
  */
-function refreshCandidateMatches(jdId) {
+export function refreshCandidateMatches(jdId) {
   const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
   const jds = getStoredData(STORAGE_KEYS.jds) || [];
   const targetJD = jds.find((jd) => jd.id === jdId);
@@ -622,7 +622,7 @@ function refreshCandidateMatches(jdId) {
   // Event is automatically dispatched by setStoredData
 }
 
-function ensureMatches() {
+export function ensureMatches() {
   const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
   const jds = getStoredData(STORAGE_KEYS.jds) || [];
   const updated = candidates.map((candidate) => {
@@ -635,7 +635,3 @@ function ensureMatches() {
   setStoredData(STORAGE_KEYS.candidates, updated);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  initStorage();
-  ensureMatches();
-});

@@ -1,0 +1,21 @@
+--- Testing Education Extraction ---
+Scanning for headers: ['Education', 'Academic', 'Qualifications', 'Academic Background', 'Educational Qualifications']
+Found header 'Education' at index 875
+Found next section header 'certifications' at 975
+Raw content extracted (100 chars):
+'Education hub (An institutional  website project) \n\uf0b7 Blood donation (A Blood bank website project) \n'
+
+Final Education Text:
+ Blood donation (A Blood bank website project)
+
+--- Testing Projects Extraction ---
+Scanning for headers: ['Projects', 'Key Projects']
+Found header 'Projects' at index 539
+Found next section header 'education' at 875
+Found next section header 'qualifications' at 710
+Found next section header 'educational qualifications' at 698
+Found next section header 'skills' at 550
+Raw content extracted (11 chars):
+'projects. \n'
+
+Final Projects Text:

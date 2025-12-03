@@ -36,53 +36,47 @@ function showMessage(text, type) {
     }, 3000);
 }
 
+import API from '../../../config/api-endpoint.js';
+import { navigateTo, routes } from '../../../src/utils/router.js';
+
 loginForm.addEventListener('submit', function (e) {
     e.preventDefault();
 
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value.trim();
 
-    // TODO: Replace this with a backend API call.
-    // =================================================
-    // fetch('/api/auth/company/login', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ email, password })
-    // })
-    // .then(response => {
-    //     if (!response.ok) {
-    //         throw new Error('Invalid email or password!');
-    //     }
-    //     return response.json();
-    // })
-    // .then(data => {
-    //     // On successful login, store the token and redirect.
-    //     sessionStorage.setItem('companyAuthToken', data.token); // Store token
-    //     showMessage('Login successful! Redirecting...', 'success');
-    //     setTimeout(() => window.location.href = './dashboard.html', 1500);
-    // })
-    // .catch(error => {
-    //     showMessage(error.message, 'error');
-    // });
-    // =================================================
+    showMessage('Logging in...', 'info');
 
-    // DEMO: Check if email matches allowed one
-    if (email === allowedEmail && password === allowedPassword) {
-        showMessage('Login successful! Redirecting...', 'success');
-        sessionStorage.setItem('isCompanyLoggedIn', 'true'); // Set session flag
-        setTimeout(() => {
-            window.location.href = './dashboard.html';
-        }, 1500);
-    } else {
-        showMessage('Invalid email or password!', 'error');
-        console.log('Unauthorized login attempt:', { email });
-    }
+    fetch(API.auth.login, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.detail || 'Invalid email or password!'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // On successful login, store the token and redirect.
+            sessionStorage.setItem('companyAuthToken', data.token); // Store token
+            sessionStorage.setItem('companyData', JSON.stringify(data)); // Store company data
+            sessionStorage.setItem('isCompanyLoggedIn', 'true'); // Set session flag
+
+            showMessage('Login successful! Redirecting...', 'success');
+            setTimeout(() => navigateTo(routes.company.dashboard), 1500);
+        })
+        .catch(error => {
+            console.error('Login error:', error);
+            showMessage(error.message, 'error');
+        });
 });
 
 registerBtn.addEventListener('click', function () {
     showMessage('Redirecting to plans...', 'success');
     // Redirect to plans page
     setTimeout(() => {
-        window.location.href = 'plans.html';
+        navigateTo(routes.company.plans);
     }, 1500);
 });

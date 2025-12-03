@@ -1,10 +1,19 @@
+import API from '../../config/api-endpoint.js';
 
+// Auto open popup after 5 seconds
+setTimeout(() => {
+    // Only open the popup if no user is currently logged in
+    if (!googleUser) {
+        openPopup();
+    }
+}, 5000);
 
 // Function to open popup
 function openPopup() {
     document.getElementById('overlay').classList.add('active');
     document.body.style.overflow = 'hidden'; // prevent scroll when popup is open
 }
+window.openPopup = openPopup;
 
 // Function to close popup (only via × button)
 function closePopup() {
@@ -12,6 +21,7 @@ function closePopup() {
     document.body.style.overflow = 'auto';
     history.replaceState(null, null, ' '); // remove #sign-in from URL
 }
+window.closePopup = closePopup;
 
 // Automatically open popup when URL contains #sign-in
 window.addEventListener('load', () => {
@@ -23,7 +33,7 @@ window.addEventListener('load', () => {
     initializeGoogleSignIn();
 
     // Check if user is already signed in on page load
-    const savedUser = sessionStorage.getItem('googleUser'); // Changed from localStorage
+    const savedUser = sessionStorage.getItem('googleUser');
     if (savedUser) {
         try {
             const user = JSON.parse(savedUser);
@@ -31,7 +41,7 @@ window.addEventListener('load', () => {
             updateSignInButtonToProfile(user);
         } catch (error) {
             console.error('Error loading saved user:', error);
-            sessionStorage.removeItem('googleUser'); // Changed from localStorage
+            sessionStorage.removeItem('googleUser');
         }
     }
 
@@ -56,17 +66,10 @@ window.addEventListener('load', () => {
             }
 
             // --- 3. Backend Integration Point ---
-            // This is where you send the login credentials to your backend for verification.
             try {
                 console.log('Attempting to log in with:', { email });
 
-                // --- Backend Integration Point ---
-                // In a real application, you would send the email and password to your backend.
-                // The backend would validate the credentials and, if successful, return the user's data.
-
-                /*
-                // EXAMPLE: How to send data to a backend login endpoint
-                const response = await fetch('/api/login', { // Replace with your actual API endpoint
+                const response = await fetch(API.user.login, { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password }),
@@ -74,25 +77,26 @@ window.addEventListener('load', () => {
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.message || 'Login failed. Please check your credentials.');
+                    throw new Error(errorData.detail || 'Login failed. Please check your credentials.');
                 }
 
-                const user = await response.json();
-                displayUserInfo(user); 
-                closePopup(); 
-                */
-
-                // --- DEMO-ONLY LOGIC (To be replaced by actual backend call) ---
-                // For demonstration, we'll simulate a successful login and create a mock user object.
-                const mockUser = {
-                    name: email.split('@')[0], // Use the part of the email before the '@' as the name
-                    email: email,
-                    picture: 'https://via.placeholder.com/150/7c3aed/ffffff?text=' + email.charAt(0).toUpperCase() // A placeholder profile picture
+                const data = await response.json();
+                
+                // Construct user object from response
+                const user = {
+                    name: data.fullName,
+                    email: data.email,
+                    picture: data.picture || 'https://via.placeholder.com/150/7c3aed/ffffff?text=' + data.fullName.charAt(0).toUpperCase(),
+                    token: data.token,
+                    id: data.user_id
                 };
 
-                // Update the UI with the mock user's information and close the popup
-                displayUserInfo(mockUser);
+                // Update the UI with the user's information and close the popup
+                displayUserInfo(user);
                 closePopup();
+                
+                // Store token separately if needed for other requests
+                sessionStorage.setItem('authToken', data.token);
 
             } catch (error) {
                 console.error('Login Error:', error);
@@ -109,11 +113,12 @@ let tokenClient = null;
 // Function to initialize Google Sign-In
 function initializeGoogleSignIn() {
     const googleSignInBtn = document.getElementById('googleSignInBtn');
+    const CLIENT_ID = '19336390572-4o00kvnppt5ftohmd7n0cv94mir54551.apps.googleusercontent.com';
 
     // Wait for Google Identity Services to load
     function waitForGoogle() {
         if (typeof google !== 'undefined' && google.accounts) {
-            setupGoogleSignIn();
+            setupGoogleSignIn(CLIENT_ID);
         } else {
             // Retry if Google Identity Services hasn't loaded yet
             setTimeout(waitForGoogle, 100);
@@ -123,9 +128,8 @@ function initializeGoogleSignIn() {
     waitForGoogle();
 }
 
-function setupGoogleSignIn() {
+function setupGoogleSignIn(CLIENT_ID) {
     const googleSignInBtn = document.getElementById('googleSignInBtn');
-    const CLIENT_ID = '716638260025-otlb8qrc3p2fs6288oh4u1v1qe3upkh5.apps.googleusercontent.com';
 
     // Initialize Google Identity Services
     google.accounts.id.initialize({
@@ -154,7 +158,6 @@ function setupGoogleSignIn() {
                 // If One Tap is not available, use OAuth 2.0 popup
                 if (tokenClient) {
                     tokenClient.requestAccessToken({ prompt: 'consent' });
-                    // Note: We don't add a loader here as the popup flow is immediate.
                 }
             }
         });
@@ -162,80 +165,97 @@ function setupGoogleSignIn() {
 }
 
 // Handle credential response from Google One Tap
-function handleCredentialResponse(response) {
+async function handleCredentialResponse(response) {
     try {
-        // Decode the JWT token to get user info
-        const payload = JSON.parse(atob(response.credential.split('.')[1]));
+        console.log("Google Credential Response:", response);
+        
+        // Send the ID token to the backend
+        const res = await fetch(API.user.googleLogin, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: response.credential })
+        });
 
-        // Store user info
-        googleUser = {
-            name: payload.name,
-            email: payload.email,
-            picture: payload.picture,
-            sub: payload.sub
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.detail || 'Google Login failed');
+        }
+
+        const data = await res.json();
+        
+        const user = {
+            name: data.fullName,
+            email: data.email,
+            picture: data.picture,
+            token: data.token,
+            id: data.user_id
         };
 
-        // Display user info
-        displayUserInfo(googleUser);
+        displayUserInfo(user);
+        sessionStorage.setItem('authToken', data.token);
 
-        // Close the popup after successful sign-in
         setTimeout(() => {
             closePopup();
-            // Restore button state in case it was still loading
             const googleSignInBtn = document.getElementById('googleSignInBtn');
             if (googleSignInBtn) googleSignInBtn.classList.remove('loading');
         }, 2000);
+
     } catch (error) {
         console.error('Error handling credential response:', error);
-        alert('Failed to sign in with Google. Please try again.');
+        alert('Failed to sign in with Google: ' + error.message);
+        const googleSignInBtn = document.getElementById('googleSignInBtn');
+        if (googleSignInBtn) googleSignInBtn.classList.remove('loading');
     }
 }
 
 // Handle token response from OAuth 2.0 flow
-function handleTokenResponse(tokenResponse) {
+async function handleTokenResponse(tokenResponse) {
     if (tokenResponse.error) {
         console.error('Google Sign-In error:', tokenResponse.error);
         alert('Failed to sign in with Google: ' + tokenResponse.error);
-        // Restore button state on error
         const googleSignInBtn = document.getElementById('googleSignInBtn');
         if (googleSignInBtn) googleSignInBtn.classList.remove('loading');
         return;
     }
 
-    // Fetch user info using the access token
-    fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: {
-            'Authorization': `Bearer ${tokenResponse.access_token}`
-        }
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to fetch user info');
-            }
-            return response.json();
-        })
-        .then(data => {
-            googleUser = {
-                name: data.name,
-                email: data.email,
-                picture: data.picture,
-                id: data.id
-            };
-            displayUserInfo(googleUser);
-
-            // Close the popup after successful sign-in
-            setTimeout(() => {
-                closePopup();
-                // Restore button state
-                const googleSignInBtn = document.getElementById('googleSignInBtn');
-                if (googleSignInBtn) googleSignInBtn.classList.remove('loading');
-            }, 2000);
-        })
-        .catch(error => {
-            console.error('Error fetching user info:', error);
-            alert('Failed to sign in with Google. Please try again.');
-            document.getElementById('googleSignInBtn')?.classList.remove('loading');
+    try {
+        // Send the access token to the backend
+        const res = await fetch(API.user.googleLogin, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: tokenResponse.access_token })
         });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.detail || 'Google Login failed');
+        }
+
+        const data = await res.json();
+        
+        const user = {
+            name: data.fullName,
+            email: data.email,
+            picture: data.picture,
+            token: data.token,
+            id: data.user_id
+        };
+
+        displayUserInfo(user);
+        sessionStorage.setItem('authToken', data.token);
+
+        setTimeout(() => {
+            closePopup();
+            const googleSignInBtn = document.getElementById('googleSignInBtn');
+            if (googleSignInBtn) googleSignInBtn.classList.remove('loading');
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error handling token response:', error);
+        alert('Failed to sign in with Google: ' + error.message);
+        const googleSignInBtn = document.getElementById('googleSignInBtn');
+        if (googleSignInBtn) googleSignInBtn.classList.remove('loading');
+    }
 }
 
 // Display user information after successful sign-in
@@ -271,24 +291,8 @@ function updateSignInButtonToProfile(user) {
         `;
         userSignInBtn.onclick = (e) => {
             e.preventDefault();
-
-            // Try first location
-            const url1 = '../User-module/profile-section.html';
-            const url2 = './User-module/profile-section.html';
-
-            // Check if the file exists using fetch
-            fetch(url1, { method: 'HEAD' })
-                .then((response) => {
-                    if (response.ok) {
-                        window.location.href = url1;
-                    } else {
-                        window.location.href = url2;
-                    }
-                })
-                .catch(() => {
-                    // If fetch fails, go to second path
-                    window.location.href = url2;
-                });
+            // Redirect to the dedicated profile page (connected to actual file)
+            window.location.href = '/User-module/profile-section.html';
         };
 
         // Store user data in sessionStorage for persistence within the current session
@@ -320,9 +324,6 @@ function logout() {
     if (hrLoginBtn) {
         hrLoginBtn.style.display = 'flex';
     }
-
-    // Redirect to home page after logout, as the profile page will no longer be active
-    // and the user should be taken back to a non-logged-in state.
 
     // Show success message
     alert('Successfully signed out!');

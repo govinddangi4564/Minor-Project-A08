@@ -10,6 +10,8 @@ from routes.company_route import router as company_router
 from routes.candidate_route import router as candidate_router
 from routes.shortlist_route import router as shortlist_router
 from routes.matching_route import router as matching_router
+from routes.dashboard_route import router as dashboard_router
+from routes.admin_route import router as admin_router
 
 from models.base import engine, session
 
@@ -40,10 +42,18 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
         content={"message": exc.detail}
     )
 
-app.include_router(user_router, prefix="/api", tags=["User"])
+app.include_router(user_router, prefix="/api/user", tags=["User"])
 app.include_router(resume_router, prefix="/api", tags=["Resume"])
 app.include_router(jd_router, prefix="/api", tags=["Job Descriptions"])
 app.include_router(company_router, prefix="/api", tags=["Company"])
 app.include_router(candidate_router, prefix="/api", tags=["Candidates"])
 app.include_router(shortlist_router, prefix="/api", tags=["Shortlist"])
 app.include_router(matching_router, prefix="/api", tags=["Matching"])
+app.include_router(dashboard_router, prefix="/api", tags=["Dashboard"])
+app.include_router(admin_router, prefix="/api", tags=["Admin"])
+
+from routes.interview_route import router as interview_router
+app.include_router(interview_router, prefix="/api/company", tags=["Interviews"])
+
+from routes.public_route import router as public_router
+app.include_router(public_router, prefix="/api", tags=["Public"])

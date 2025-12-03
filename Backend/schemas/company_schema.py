@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, HttpUrl, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from uuid import UUID
 
@@ -16,7 +16,10 @@ class CompanyProfileResponse(BaseModel):
     companyID: UUID
     companyName: str
     companyEmail: EmailStr
-    companyWebsite: Optional[HttpUrl]
+    companyWebsite: Optional[str]
+    companyAddress: Optional[str]
+    companyDescription: Optional[str]
+    plan: Optional[str]
 
     @field_validator("companyWebsite", mode="after")
     def convert_url(cls, v):
@@ -26,7 +29,9 @@ class CompanyProfileResponse(BaseModel):
 class CompanyUpdateSchema(BaseModel):
     companyName: str
     companyEmail: EmailStr
-    companyWebsite: Optional[HttpUrl]
+    companyWebsite: Optional[str]
+    companyAddress: Optional[str]
+    companyDescription: Optional[str]
 
     @field_validator("companyWebsite", mode="after")
     def convert_url(cls, v):
@@ -44,3 +49,4 @@ class RegisterCompanySchema(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
     plan: str
+    website: str

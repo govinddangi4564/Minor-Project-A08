@@ -65,13 +65,7 @@
   .upload-logo,
   .feature-text p,
   section p.sub,
-  .file-list,
-  .problem-card ul,
-  .solution-card ul,
-  .section-title,
-  .feature-title,
-  .timeline-title,
-  .progress-label {
+  .file-list {
     color: #fff;
   }
 
@@ -80,11 +74,7 @@
     color: #a5dcde;
   }
 
-  .Ex_feature,
-  .problem-card,
-  .solution-card,
-  .feature-card,
-  .timeline-content {
+  .Ex_feature {
     background: rgb(47, 47, 42);
     box-shadow: 0 2px 6px rgba(208, 186, 186, 0.15);
   }
@@ -116,20 +106,6 @@
   .feature:hover {
     transform: translateY(-5px);
     box-shadow: 0 15px 30px rgba(174, 155, 155, 0.15);
-  }
-
-  #why-choose {
-    color: #ffd500;
-  }
-
-  #intro {
-    color: #eaeff2;
-  }
-
-  .feature-description,
-  .timeline-description,
-  .cta-section {
-    color: #bbb5b5;
   }
 }
 

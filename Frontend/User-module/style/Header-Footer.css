@@ -12,7 +12,7 @@ nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 2px;
+  padding: 5px 20px;
   position: relative;
   /* Needed for positioning the mobile menu */
 }
@@ -21,8 +21,6 @@ nav {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* padding-left: 20px; */
-  margin-left: 20px;
 }
 
 h2.name {

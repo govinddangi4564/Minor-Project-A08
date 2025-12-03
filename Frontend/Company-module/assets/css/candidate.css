@@ -49,7 +49,7 @@
   background: var(--card-bg);
   padding: 20px;
   border-radius: 8px;
-  margin: 24px 0;
+  margin: 16px 0;
 }
 
 .candidate-page .timeline {
@@ -274,4 +274,41 @@
     width: calc(100% - 24px);
     max-width: none;
   }
+}
+
+/* Project List Styles */
+.candidate-page .project-list-container {
+  background: var(--card-bg);
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.candidate-page .project-list {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.candidate-page .project-list li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.candidate-page .project-list li:last-child {
+  margin-bottom: 0;
+}
+
+/* Education List Styles */
+.candidate-page .education-list {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.candidate-page .education-list li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.candidate-page .education-list li:last-child {
+  margin-bottom: 0;
 }

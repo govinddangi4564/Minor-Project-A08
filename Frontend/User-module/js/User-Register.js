@@ -1,3 +1,5 @@
+import API from '../../config/api-endpoint.js';
+
 document.addEventListener('DOMContentLoaded', function () {
     // --- 1. ELEMENT SELECTION ---
     const registrationForm = document.getElementById('registrationForm');
@@ -28,9 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             console.log('Submitting registration data to backend:', formData);
 
-            /*
-            // EXAMPLE: How to send data to a backend registration endpoint
-            const response = await fetch('/api/register', { // Replace with your actual API endpoint
+            const response = await fetch(API.user.register, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData),
@@ -38,27 +38,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Registration failed.');
+                throw new Error(errorData.detail || 'Registration failed.');
             }
 
-            const user = await response.json(); // Backend should return the new user object
-            */
+            const result = await response.json(); 
 
-            // --- DEMO-ONLY LOGIC (Simulate user creation) ---
-            const user = {
-                name: formData.fullName,
-                email: formData.email,
-                picture: 'https://via.placeholder.com/150/7c3aed/ffffff?text=' + formData.fullName.charAt(0).toUpperCase(),
-                phone: formData.phone,
-                newsletter: formData.newsletter
-            };
-
-            // --- Create Session and Redirect ---
-            // Store user data in sessionStorage to log them in for the current session
-            sessionStorage.setItem('googleUser', JSON.stringify(user));
-
-            alert('Registration successful! Welcome, ' + user.name);
-            // Redirect to the home page, where they will now be logged in
+            alert('Registration successful! Please login.');
+            // Redirect to the login page (or home page if auto-login implemented later)
+            // For now, redirecting to home as per original flow, but ideally should be login
             window.location.href = '../Index.html';
 
         } catch (error) {
@@ -99,51 +86,66 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // --- 4. GOOGLE SIGN-UP ACTIVATION ---
-// This function is now in the global scope and will be called by the Google script
-// once it has finished loading, thanks to the `data-callback` attribute.
 function initializeGoogleSignUp() {
     const googleSignUpBtn = document.getElementById('googleSignUpBtn');
+    const CLIENT_ID = '19336390572-4o00kvnppt5ftohmd7n0cv94mir54551.apps.googleusercontent.com';
 
-    const CLIENT_ID = '716638260025-otlb8qrc3p2fs6288oh4u1v1qe3upkh5.apps.googleusercontent.com';
+    // Wait for Google Identity Services to load
+    function waitForGoogle() {
+        if (typeof google !== 'undefined' && google.accounts) {
+            google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleGoogleSignUpResponse,
+            });
 
-    // Initialize the Google Identity Services client
-    google.accounts.id.initialize({
-        client_id: CLIENT_ID,
-        callback: handleGoogleSignUpResponse, // Use a specific callback for sign-up
-    });
-
-    // Attach the click listener to the Google Sign-Up button
-    googleSignUpBtn.addEventListener('click', () => {
-        google.accounts.id.prompt(); // Trigger the Google One Tap UI
-    });
-
-    console.log('Google Sign-Up button is now active.');
+            googleSignUpBtn.addEventListener('click', () => {
+                google.accounts.id.prompt();
+            });
+        } else {
+            setTimeout(waitForGoogle, 100);
+        }
+    }
+    waitForGoogle();
 }
 
 // Callback function to handle the response from Google Sign-Up
-function handleGoogleSignUpResponse(response) {
+async function handleGoogleSignUpResponse(response) {
     try {
-        // Decode the JWT to get user information
-        const payload = JSON.parse(atob(response.credential.split('.')[1]));
+        console.log("Google Sign-Up Response:", response);
 
-        // Create a user object from the Google payload
+        // Send the ID token to the backend
+        const res = await fetch(API.user.googleLogin, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: response.credential })
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.detail || 'Google Sign-Up failed');
+        }
+
+        const data = await res.json();
+        
         const user = {
-            name: payload.name,
-            email: payload.email,
-            picture: payload.picture,
-            phone: '', // Phone is not provided by Google, leave it empty
-            newsletter: true // Default to true for new sign-ups
+            name: data.fullName,
+            email: data.email,
+            picture: data.picture,
+            token: data.token,
+            id: data.user_id
         };
 
-        // Store the user data in sessionStorage to create a session
         sessionStorage.setItem('googleUser', JSON.stringify(user));
+        sessionStorage.setItem('authToken', data.token);
 
         alert('Sign-up with Google successful! Welcome, ' + user.name);
-        // Redirect to the home page
         window.location.href = '../Index.html';
 
     } catch (error) {
         console.error('Error handling Google Sign-Up response:', error);
-        alert('Failed to sign up with Google. Please try again.');
+        alert('Failed to sign up with Google: ' + error.message);
     }
 }
+
+// Initialize on load
+window.addEventListener('load', initializeGoogleSignUp);

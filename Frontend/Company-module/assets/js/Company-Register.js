@@ -9,18 +9,18 @@ const registrationForm = document.getElementById('registrationForm');
     try {
         const savedPlanRaw = localStorage.getItem('companyPlan');
         if (!savedPlanRaw) {
-            window.location.href = './plans.html';
+            navigateTo(routes.company.plans);
             return;
         }
         const plan = JSON.parse(savedPlanRaw);
         if (!plan || !plan.name) {
-            window.location.href = './plans.html';
+            navigateTo(routes.company.plans);
             return;
         }
         selectedPlanName.textContent = plan.name + ' Plan';
         window.scrollTo(0, 0);
     } catch (_) {
-        window.location.href = './plans.html';
+        navigateTo(routes.company.plans);
     }
 })();
 
@@ -59,45 +59,67 @@ function showMessage(text, type) {
 
 // Back button: go to plans page
 backBtn.addEventListener('click', function () {
-    window.location.href = './plans.html';
+    navigateTo(routes.company.plans);
 });
+
+import API from '../../../config/api-endpoint.js';
+import { navigateTo, routes } from '../../../src/utils/router.js';
 
 // Form submission
 registrationForm.addEventListener('submit', function (e) {
     e.preventDefault();
 
-    const firstName = this.elements[0].value;
-    const lastName = this.elements[1].value;
-    const email = this.elements[2].value;
-    const password = this.elements[3].value;
+    const fullName = this.elements[0].value; // "Full Name" input
+    const companyName = this.elements[1].value; // "Company Name" input
+    const email = this.elements[2].value; // "Email" input
+    const password = this.elements[3].value; // "Password" input
     const plan = selectedPlanName.textContent;
+    const website = ""; // Add website input if needed, or leave empty
 
-    // TODO: Replace this with a backend API call.
-    // =================================================
-    // const registrationData = { firstName, lastName, email, password, plan };
-    // fetch('/api/companies/register', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(registrationData)
-    // })
-    // .then(response => response.json())
-    // .then(data => {
-    //     sessionStorage.setItem('companyAuthToken', data.token); // Auto-login
-    //     showMessage('Registration successful! Redirecting...', 'success');
-    //     setTimeout(() => window.location.href = './dashboard.html', 1500);
-    // })
-    // .catch(error => showMessage('Registration failed!', 'error'));
-    // =================================================
+    // Construct payload matching RegisterCompanySchema
+    const registrationData = {
+        name: companyName,
+        email: email,
+        password: password,
+        website: website,
+        plan: plan
+    };
 
-    // DEMO: Simulate successful registration and redirect
-    showMessage('Registration success redirect to dashboard...', 'success');
-    sessionStorage.setItem('isCompanyLoggedIn', 'true'); // Set session flag
+    showMessage('Registering...', 'info');
 
-    // In a real application, redirect to registration page
-    setTimeout(() => {
-        window.location.href = './dashboard.html';
-    }, 1500);
+    fetch(API.company.register, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registrationData)
+    })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { 
+                    const error = new Error(err.detail || 'Registration failed!');
+                    error.status = response.status;
+                    throw error;
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Auto-login or redirect to login
+            // The backend returns company profile, but not a token directly in the register response based on the route code I saw.
+            // Route: returns { companyID, companyName, companyEmail, companyWebsite }
 
-    // Reset form
-    this.reset();
+            showMessage('Registration successful! Please login.', 'success');
+            setTimeout(() => navigateTo(routes.company.login), 1500);
+        })
+        .catch(error => {
+            console.error('Registration error:', error);
+            
+            // Check if it's a duplicate email error (409 Conflict)
+            if (error.status === 409) {
+                showMessage('User already exists. Please try login. Redirecting...', 'error');
+                // Redirect to login page after 2.5 seconds
+                setTimeout(() => navigateTo(routes.company.login), 2500);
+            } else {
+                showMessage(error.message, 'error');
+            }
+        });
 });

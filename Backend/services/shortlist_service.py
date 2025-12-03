@@ -1,13 +1,17 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
-from models import Shortlist, Candidate
+from models import Shortlist, Candidate, JobDescription
 from schemas.shortlist_schema import ShortlistCreate
 
-def get_shortlist(db: Session, candidate_name: Optional[str] = None) -> List[Shortlist]:
-    query = db.query(Shortlist).join(Candidate)
+def get_shortlist(db: Session, candidate_name: Optional[str] = None, jd_id: Optional[UUID] = None, jd_title: Optional[str] = None) -> List[Shortlist]:
+    query = db.query(Shortlist).join(Candidate).join(JobDescription)
     if candidate_name:
         query = query.filter(Candidate.name.ilike(f"%{candidate_name}%"))
+    if jd_id:
+        query = query.filter(Shortlist.jd_id == jd_id)
+    if jd_title:
+        query = query.filter(JobDescription.title.ilike(f"%{jd_title}%"))
     return query.all()
 
 

@@ -1,8 +1,19 @@
 from passlib.context import CryptContext
 import jwt
+from jwt import PyJWTError
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import os
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
+from models.base import get_db
+from models.companies_model import Company
+from models.user_model import UserModel
+
+bearer = HTTPBearer()
+
 
 # Secret key and algorithm
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -72,3 +83,39 @@ def verify_token(token: str) -> bool:
         return True
     except Exception:
         return False
+
+
+
+def get_authenticated_entity(creds: HTTPAuthorizationCredentials = Depends(bearer),
+                             db: Session = Depends(get_db)
+    ):
+    token = creds.credentials
+    payload = None
+
+    # Try decoding normally
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except PyJWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    entity_type = payload.get("type")
+    entity_id = payload.get("entity")
+
+    if not entity_type or not entity_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Malformed token")
+
+    # If it's a company
+    if entity_type == "company":
+        company = db.query(Company).filter(Company.id == entity_id).first()
+        if not company:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+        return {"type": "company", "entity": company, "entity_id": entity_id}
+
+    # If it's a user
+    if entity_type == "user":
+        user = db.query(UserModel).filter(UserModel.user_id == entity_id).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        return {"type": "user", "entity": user, "entity_id": entity_id}
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")

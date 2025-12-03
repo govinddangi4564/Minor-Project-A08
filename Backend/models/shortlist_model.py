@@ -19,6 +19,7 @@ class Shortlist(Base):
     shortlisted_at = Column(DateTime(timezone=True), server_default=func.now())
 
     shortlisted_by = Column(UUID(as_uuid=True), ForeignKey("companies.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Optional relationships
     candidates = relationship("Candidate", back_populates="shortlists")

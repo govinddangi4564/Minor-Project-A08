@@ -11,10 +11,6 @@ class JDBase(BaseModel):
     keywords: Optional[List[Any]] = None
 
 
-class JDCreate(JDBase):
-    created_by: UUID4
-
-
 class JDUpdate(BaseModel):
     title: Optional[str] = None
     department: Optional[str] = None
@@ -27,7 +23,8 @@ class JDOut(JDBase):
     id: UUID4
     created_at: datetime
     updated_at: Optional[datetime]
-    created_by: UUID4
+    created_by: UUID4 | None = None
+    company_id: UUID4 | None = None
 
     class Config:
         orm_mode = True

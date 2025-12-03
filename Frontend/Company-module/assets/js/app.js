@@ -1,3 +1,5 @@
+import { STORAGE_KEYS, getStoredData, initStorage, ensureMatches } from './data.js';
+
 function setActiveNav() {
   const current = window.location.pathname.split("/").pop() || "index.html";
   document.querySelectorAll(".nav-link").forEach((link) => {
@@ -210,6 +212,8 @@ function setupSidebarToggle() {
 }
 
 function initShared() {
+  initStorage();
+  ensureMatches();
   setActiveNav();
   handleThemeToggle();
   initTabs();

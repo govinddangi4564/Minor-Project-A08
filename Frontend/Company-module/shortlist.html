@@ -15,9 +15,8 @@
       window.location.href = 'Company-login.htm';
     }
   </script>
-  <script src="assets/js/data.js" defer></script>
-  <script src="assets/js/app.js" defer></script>
-  <script src="assets/js/shortlist.js" defer></script>
+  <script type="module" src="assets/js/app.js" defer></script>
+  <script type="module" src="assets/js/shortlist.js" defer></script>
 </head>
 
 <body class="shortlist-page">
@@ -49,6 +48,7 @@
           <div class="breadcrumbs">Review AI ranked candidates and take actions</div>
         </div>
         <div class="report-actions">
+          <button id="runMatchingBtn" class="btn btn-secondary">🤖 Run AI Matching</button>
           <button id="compareBtn" class="btn btn-outline">Compare Candidates</button>
           <button id="exportBtn" class="btn btn-primary">Export Shortlist</button>
         </div>
@@ -94,6 +94,7 @@
               <tr>
                 <th>Name</th>
                 <th>Experience</th>
+                <th>Matched JD</th>
                 <th>Skill Match %</th>
                 <th>SBERT Score</th>
                 <th>Final Score</th>

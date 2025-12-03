@@ -1,468 +1,276 @@
+import API from '../../../config/api-endpoint.js';
+import { navigateTo, routes, logout } from '../../../src/utils/router.js';
+import { getStoredData, STORAGE_KEYS } from './data.js';
+
 /**
  * ============================================================================
  * DASHBOARD PAGE - Analytics & Metrics
  * ============================================================================
  * 
  * BACKEND INTEGRATION:
- * Replace getStoredData() calls with API endpoints for real-time analytics
+ * API endpoints for real-time analytics
  * 
  * API ENDPOINTS:
  * 
- * 1. GET /api/dashboard/stats
- *    Headers: { 'Authorization': 'Bearer <token>' }
- *    Response: {
- *      resumes_scanned: 150,
- *      shortlisted: 25,
- *      avg_match_score: 78,
- *      active_jds: 5,
- *      trends: { 
- *        weekly_growth: 12, 
- *        conversion_rate: 8,
- *        top_department: "Engineering",
- *        top_skill: "Python"
- *      }
- *    }
+ * 1. GET /api/company/dashboard/stats
+ * 2. GET /api/company/dashboard/skills-distribution
+ * 3. GET /api/company/dashboard/match-trends
  * 
- * 2. GET /api/dashboard/skills-distribution?days=7
- *    Response: { 
- *      skills: [
- *        { name: "Python", count: 45, percentage: 30 },
- *        { name: "React", count: 32, percentage: 21 },
- *        ...
- *      ] 
- *    }
- * 
- * 3. GET /api/dashboard/match-trends?days=7&jd_id=xxx
- *    Response: { 
- *      trends: [
- *        { date: "2025-01-15", avg_score: 85, shortlisted_count: 5, total_candidates: 12 },
- *        { date: "2025-01-16", avg_score: 82, shortlisted_count: 3, total_candidates: 8 },
- *        ...
- *      ],
- *      jd_breakdown: [
- *        { jd_id: "jd-1", jd_title: "Full Stack Developer", daily_scores: [...] },
- *        ...
- *      ]
- *    }
- * 
- * DATABASE QUERIES (Backend Implementation):
- * 
- * 1. Dashboard Stats:
- *    SELECT 
- *      COUNT(DISTINCT c.id) as resumes_scanned,
- *      COUNT(DISTINCT CASE WHEN s.shortlisted = true THEN s.candidate_id END) as shortlisted,
- *      AVG(cm.final_score) as avg_match_score,
- *      COUNT(DISTINCT jd.id) as active_jds
- *    FROM candidates c
- *    LEFT JOIN candidate_matches cm ON c.id = cm.candidate_id
- *    LEFT JOIN shortlist s ON c.id = s.candidate_id
- *    LEFT JOIN job_descriptions jd ON jd.status = 'active'
- *    WHERE c.uploaded_at >= NOW() - INTERVAL '7 days';
- * 
- * 2. Skills Distribution:
- *    SELECT 
- *      skill_name as name,
- *      COUNT(*) as count,
- *      ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM candidates), 2) as percentage
- *    FROM (
- *      SELECT UNNEST(c.skills) as skill_name
- *      FROM candidates c
- *      WHERE c.uploaded_at >= NOW() - INTERVAL :days DAY
- *    ) skills
- *    GROUP BY skill_name
- *    ORDER BY count DESC
- *    LIMIT 10;
- * 
- * 3. Match Trends (Last 7 days):
- *    SELECT 
- *      DATE(c.uploaded_at) as date,
- *      AVG(cm.final_score) as avg_score,
- *      COUNT(DISTINCT CASE WHEN s.shortlisted = true THEN c.id END) as shortlisted_count,
- *      COUNT(DISTINCT c.id) as total_candidates
- *    FROM candidates c
- *    LEFT JOIN candidate_matches cm ON c.id = cm.candidate_id
- *    LEFT JOIN shortlist s ON c.id = s.candidate_id
- *    WHERE c.uploaded_at >= NOW() - INTERVAL '7 days'
- *      AND (:jd_id IS NULL OR cm.jd_id = :jd_id)
- *    GROUP BY DATE(c.uploaded_at)
- *    ORDER BY date ASC;
- * 
- * PERFORMANCE OPTIMIZATION:
- * - Cache dashboard stats for 5 minutes
- * - Use materialized views for complex aggregations
- * - Index on: candidates.uploaded_at, shortlist.shortlisted, candidate_matches.calculated_at
- * 
- * REAL-TIME UPDATES:
- * - Use WebSocket or Server-Sent Events for live updates
- * - Push notifications when new candidates are uploaded
- * - Auto-refresh every 30 seconds if tab is active
  * ============================================================================
  */
 
-function renderDashboardCards() {
+async function renderDashboardCards() {
   const dashboardEl = document.querySelector("#dashboardCards");
   if (!dashboardEl) return;
 
-  // TODO: Replace with API call
-  // const stats = await fetch('/api/company/dashboard/stats', {
-  //   headers: { 'Authorization': `Bearer ${sessionStorage.getItem('companyAuthToken')}` }
-  // }).then(r => r.json());
-  // 
-  // dashboardEl.innerHTML = `
-  //   <div class="card">
-  //     <h3>Resumes Scanned</h3>
-  //     <div class="metric">${stats.resumes_scanned}</div>
-  //     <div class="trend positive">
-  //        ▲ ${stats.trends.weekly_growth} new this week
-  //     </div>
-  //   </div>
-  //   ...
-  // `;
+  const token = sessionStorage.getItem('companyAuthToken');
+  if (!token) {
+    console.error('No auth token found');
+    return;
+  }
 
-  const jds = getStoredData(STORAGE_KEYS.jds) || [];
-  const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
-  const shortlist = getStoredData(STORAGE_KEYS.shortlist) || {};
-
-  // Calculate key metrics
-  const scanned = candidates.length;
-  const shortlisted = Object.values(shortlist).filter((entry) => entry.shortlisted).length;
-  const avgScore = candidates.length
-    ? Math.round(
-      candidates.reduce((acc, c) => acc + (c.matches?.finalScore || 0), 0) / candidates.length
-    )
-    : 0;
-  const activeJDs = jds.length;
-
-  // Calculate growth rates and trends
-  const weeklyGrowth = Math.round(scanned * 0.15); // Simulated 15% weekly growth
-  const conversionRate = Math.round((shortlisted / scanned) * 100) || 0;
-
-  // Get top performing department
-  const deptPerformance = jds.reduce((acc, jd) => {
-    const deptCandidates = candidates.filter(c => c.matches?.jdId === jd.id);
-    const avgDeptScore = deptCandidates.length
-      ? deptCandidates.reduce((sum, curr) => sum + (curr.matches?.finalScore || 0), 0) / deptCandidates.length
-      : 0;
-    if (!acc.topDept || avgDeptScore > acc.topScore) {
-      acc.topDept = jd.department;
-      acc.topScore = Math.round(avgDeptScore);
-    }
-    return acc;
-  }, { topDept: '', topScore: 0 });
-
-  // Get highest matched skill
-  const skillCounts = candidates.reduce((acc, candidate) => {
-    candidate.skills?.forEach(skill => {
-      acc[skill] = (acc[skill] || 0) + 1;
+  try {
+    const response = await fetch(API.company.dashboard.stats, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
-    return acc;
-  }, {});
-  const topSkill = Object.entries(skillCounts)
-    .sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A';
 
-  dashboardEl.innerHTML = `
-    <div class="card">
-      <h3>Resumes Scanned</h3>
-      <div class="metric">${scanned}</div>
-      <div class="trend ${weeklyGrowth >= 0 ? 'positive' : 'negative'}">
-        ${weeklyGrowth >= 0 ? '▲' : '▼'} ${Math.abs(weeklyGrowth)} new this week
-      </div>
-    </div>
-    <div class="card">
-      <h3>Candidates Shortlisted</h3>
-      <div class="metric">${shortlisted}</div>
-      <div class="trend ${conversionRate >= 10 ? 'positive' : ''}">
-        ${conversionRate}% conversion rate
-      </div>
-    </div>
-    <div class="card">
-      <h3>Average Match Score</h3>
-      <div class="metric">${avgScore}%</div>
-      <div class="trend positive">
-        Top skill: ${topSkill}
-      </div>
-    </div>
-    <div class="card">
-      <h3>Department Insights</h3>
-      <div class="metric">${activeJDs} Active JDs</div>
-      <div class="trend positive">
-        ${deptPerformance.topDept}: ${deptPerformance.topScore}% avg match
-      </div>
-    </div>
-  `;
+    if (!response.ok) {
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+      throw new Error('Failed to fetch stats');
+    }
+
+    const stats = await response.json();
+
+    // Default values if stats are missing or null
+    const scanned = stats.resumes_scanned || 0;
+    const shortlisted = stats.shortlisted || 0;
+    const avgScore = Math.round(stats.avg_match_score || 0);
+    const activeJDs = stats.active_jds || 0;
+
+    // Trends (optional, handle if missing)
+    const weeklyGrowth = stats.trends?.weekly_growth || 0;
+    const conversionRate = stats.trends?.conversion_rate || 0;
+    const topDept = stats.trends?.top_department || 'N/A';
+    const topScore = stats.trends?.top_dept_score || 0;
+    const topSkill = stats.trends?.top_skill || 'N/A';
+
+    dashboardEl.innerHTML = `
+        <div class="card">
+          <h3>Resumes Scanned</h3>
+          <div class="metric">${scanned}</div>
+          <div class="trend ${weeklyGrowth >= 0 ? 'positive' : 'negative'}">
+            ${weeklyGrowth >= 0 ? '▲' : '▼'} ${Math.abs(weeklyGrowth)} new this week
+          </div>
+        </div>
+        <div class="card">
+          <h3>Candidates Shortlisted</h3>
+          <div class="metric">${shortlisted}</div>
+          <div class="trend ${conversionRate >= 10 ? 'positive' : ''}">
+            ${conversionRate}% conversion rate
+          </div>
+        </div>
+        <div class="card">
+          <h3>Average Match Score</h3>
+          <div class="metric">${avgScore}%</div>
+          <div class="trend positive">
+            Top skill: ${topSkill}
+          </div>
+        </div>
+        <div class="card">
+          <h3>Department Insights</h3>
+          <div class="metric">${activeJDs} Active JDs</div>
+          <div class="trend positive">
+            ${topDept}: ${topScore}% avg match
+          </div>
+        </div>
+      `;
+  } catch (error) {
+    console.error('Error rendering dashboard cards:', error);
+    dashboardEl.innerHTML = '<p class="error">Failed to load dashboard stats.</p>';
+  }
 }
 
-function renderDashboardCharts() {
+async function renderDashboardCharts() {
   if (typeof Chart === "undefined") return;
   const skillsCtx = document.querySelector("#skillsChart");
   const matchCtx = document.querySelector("#matchChart");
   if (!skillsCtx || !matchCtx) return;
 
-  // TODO: Replace with API call
-  // const headers = { 'Authorization': `Bearer ${sessionStorage.getItem('companyAuthToken')}` };
-  // const skillsData = await fetch('/api/company/dashboard/skills-distribution', { headers })
-  //   .then(r => r.json());
-  // const trendsData = await fetch('/api/company/dashboard/match-trends', { headers })
-  //   .then(r => r.json());
+  const token = sessionStorage.getItem('companyAuthToken');
+  if (!token) return;
 
-  const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
-  const jds = getStoredData(STORAGE_KEYS.jds) || [];
+  try {
+    const headers = { 'Authorization': `Bearer ${token}` };
 
-  const skillCounts = {};
-  candidates.forEach((candidate) => {
-    candidate.skills.forEach((skill) => {
-      skillCounts[skill] = (skillCounts[skill] || 0) + 1;
-    });
-  });
+    // Fetch data in parallel - use 30 days to ensure we have data
+    const [skillsRes, trendsRes] = await Promise.all([
+      fetch(API.company.dashboard.skills + '?days=30', { headers }),
+      fetch(API.company.dashboard.trends + '?days=30', { headers })
+    ]);
 
-  const topSkills = Object.entries(skillCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6);
+    const skillsData = await skillsRes.json();
+    const trendsData = await trendsRes.json();
 
-  if (skillsCtx._chart) {
-    skillsCtx._chart.destroy();
-  }
+    // --- Render Skills Chart ---
+    const topSkills = skillsData.skills || [];
 
-  skillsCtx._chart = new Chart(skillsCtx, {
-    type: "doughnut",
-    data: {
-      labels: topSkills.map(([skill]) => skill),
-      datasets: [
-        {
-          data: topSkills.map(([, count]) => count),
-          backgroundColor: [
-            "#60a5fa",
-            "#818cf8",
-            "#f472b6",
-            "#facc15",
-            "#34d399",
-            "#2dd4bf",
-          ],
-        },
-      ],
-    },
-    options: {
-      plugins: {
-        legend: { position: "bottom" },
+    if (skillsCtx._chart) {
+      skillsCtx._chart.destroy();
+    }
+
+    skillsCtx._chart = new Chart(skillsCtx, {
+      type: "doughnut",
+      data: {
+        labels: topSkills.map((s) => s.name),
+        datasets: [
+          {
+            data: topSkills.map((s) => s.count),
+            backgroundColor: [
+              "#60a5fa",
+              "#818cf8",
+              "#f472b6",
+              "#facc15",
+              "#34d399",
+              "#2dd4bf",
+            ],
+          },
+        ],
       },
-    },
-  });
-
-  // Generate last 7 days labels (Mon, Tue, Wed, etc.)
-  const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const today = new Date();
-  const dayLabels = [];
-  const dayDates = [];
-
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dayIndex = date.getDay();
-    dayLabels.push(daysOfWeek[dayIndex === 0 ? 6 : dayIndex - 1]);
-    dayDates.push(date.toISOString().split('T')[0]);
-  }
-
-  // Get shortlist data
-  const shortlist = getStoredData(STORAGE_KEYS.shortlist) || {};
-
-  // Calculate data for each day and each JD
-  const jdDataMap = {};
-  const shortlistedCounts = new Array(7).fill(0);
-  const matchScoreData = new Array(7).fill(0);
-  const matchScoreCounts = new Array(7).fill(0);
-
-  jds.forEach((jd) => {
-    jdDataMap[jd.id] = {
-      name: jd.title,
-      scores: new Array(7).fill(0),
-      counts: new Array(7).fill(0),
-    };
-  });
-
-  // Process candidates by upload date
-  const totalCandidatesPerDay = new Array(7).fill(0);
-
-  candidates.forEach((candidate) => {
-    if (!candidate.uploadedAt) return;
-
-    const uploadDate = new Date(candidate.uploadedAt);
-    const uploadDateStr = uploadDate.toISOString().split('T')[0];
-
-    // Find which day index this candidate belongs to
-    const dayIndex = dayDates.findIndex((date) => date === uploadDateStr);
-    if (dayIndex === -1) return; // Not in last 7 days
-
-    totalCandidatesPerDay[dayIndex]++;
-
-    // Track shortlisted count
-    if (shortlist[candidate.id]?.shortlisted) {
-      shortlistedCounts[dayIndex]++;
-    }
-
-    // Track match scores per JD
-    if (candidate.matches?.jdId && jdDataMap[candidate.matches.jdId]) {
-      const jdData = jdDataMap[candidate.matches.jdId];
-      const score = candidate.matches.finalScore || 0;
-      jdData.scores[dayIndex] += score;
-      jdData.counts[dayIndex]++;
-    }
-
-    // Overall average match score
-    if (candidate.matches?.finalScore) {
-      matchScoreData[dayIndex] += candidate.matches.finalScore;
-      matchScoreCounts[dayIndex]++;
-    }
-  });
-
-  // Calculate shortlisted percentage (normalized to 0-100 scale)
-  const shortlistedPercentages = shortlistedCounts.map((count, idx) =>
-    totalCandidatesPerDay[idx] > 0 ? Math.round((count / totalCandidatesPerDay[idx]) * 100) : 0
-  );
-
-  // Calculate averages
-  const avgMatchScores = matchScoreData.map((sum, idx) =>
-    matchScoreCounts[idx] > 0 ? Math.round(sum / matchScoreCounts[idx]) : 0
-  );
-
-  // Prepare datasets for chart
-  const datasets = [
-    {
-      label: "Average Match Score",
-      data: avgMatchScores,
-      borderColor: "#3b82f6", // Blue
-      backgroundColor: "rgba(59, 130, 246, 0.2)",
-      tension: 0.4,
-      fill: true,
-      pointRadius: 4,
-      pointBackgroundColor: "#3b82f6",
-      pointBorderColor: "#fff",
-      pointBorderWidth: 2,
-    },
-    {
-      label: "Shortlisted %",
-      data: shortlistedPercentages,
-      borderColor: "#10b981", // Green
-      backgroundColor: "rgba(16, 185, 129, 0.2)",
-      tension: 0.4,
-      fill: true,
-      pointRadius: 4,
-      pointBackgroundColor: "#10b981",
-      pointBorderColor: "#fff",
-      pointBorderWidth: 2,
-    },
-  ];
-
-  // Add JD-specific lines if there are multiple JDs
-  if (jds.length > 0) {
-    jds.forEach((jd, idx) => {
-      const jdData = jdDataMap[jd.id];
-      if (jdData) {
-        const jdAverages = jdData.scores.map((sum, dayIdx) =>
-          jdData.counts[dayIdx] > 0 ? Math.round(sum / jdData.counts[dayIdx]) : 0
-        );
-
-        // Only add if there's meaningful data
-        if (jdAverages.some(score => score > 0)) {
-          const colors = [
-            "#8b5cf6", // Purple
-            "#f59e0b", // Amber
-            "#ef4444", // Red
-            "#06b6d4", // Cyan
-          ];
-          datasets.push({
-            label: jd.title,
-            data: jdAverages,
-            borderColor: colors[idx % colors.length],
-            backgroundColor: colors[idx % colors.length] + "33",
-            tension: 0.4,
-            fill: false,
-            pointRadius: 3,
-            pointBackgroundColor: colors[idx % colors.length],
-            borderDash: [5, 5],
-          });
-        }
-      }
+      options: {
+        plugins: {
+          legend: { position: "bottom" },
+        },
+      },
     });
-  }
 
-  if (matchCtx._chart) {
-    matchCtx._chart.destroy();
-  }
+    // --- Render Trends Chart ---
+    const trends = trendsData.trends || [];
+    const jdBreakdown = trendsData.jd_breakdown || [];
 
-  matchCtx._chart = new Chart(matchCtx, {
-    type: "line",
-    data: {
-      labels: dayLabels,
-      datasets: datasets,
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: true,
-          position: "top",
-          align: "center",
-          labels: {
-            usePointStyle: true,
-            padding: 15,
-            font: {
+    const dayLabels = trends.map(t => t.date);
+    const avgMatchScores = trends.map(t => t.avg_score);
+    const shortlistedCounts = trends.map(t => t.shortlisted_count); // Or calculate percentage if needed
+
+    // Prepare datasets for chart
+    const datasets = [
+      {
+        label: "Average Match Score",
+        data: avgMatchScores,
+        borderColor: "#3b82f6", // Blue
+        backgroundColor: "rgba(59, 130, 246, 0.2)",
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: "#3b82f6",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
+      },
+      // You can add shortlisted count or percentage here if available in the API response in a compatible format
+    ];
+
+    // Add JD-specific lines
+    if (jdBreakdown.length > 0) {
+      const colors = ["#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"];
+      jdBreakdown.forEach((jd, idx) => {
+        datasets.push({
+          label: jd.jd_title,
+          data: jd.daily_scores, // Ensure backend returns this array aligned with dates
+          borderColor: colors[idx % colors.length],
+          backgroundColor: colors[idx % colors.length] + "33",
+          tension: 0.4,
+          fill: false,
+          pointRadius: 3,
+          pointBackgroundColor: colors[idx % colors.length],
+          borderDash: [5, 5],
+        });
+      });
+    }
+
+    if (matchCtx._chart) {
+      matchCtx._chart.destroy();
+    }
+
+    matchCtx._chart = new Chart(matchCtx, {
+      type: "line",
+      data: {
+        labels: dayLabels,
+        datasets: datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "top",
+            align: "center",
+            labels: {
+              usePointStyle: true,
+              padding: 15,
+              font: {
+                size: 12,
+              },
+            },
+          },
+          tooltip: {
+            mode: "index",
+            intersect: false,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            padding: 12,
+            titleFont: {
+              size: 14,
+              weight: "bold",
+            },
+            bodyFont: {
               size: 12,
             },
           },
         },
-        tooltip: {
+        scales: {
+          x: {
+            grid: {
+              display: true,
+              color: "rgba(0, 0, 0, 0.05)",
+              drawBorder: false,
+            },
+            ticks: {
+              font: {
+                size: 11,
+              },
+            },
+          },
+          y: {
+            beginAtZero: true,
+            max: 100,
+            grid: {
+              display: true,
+              color: "rgba(0, 0, 0, 0.05)",
+              drawBorder: false,
+            },
+            ticks: {
+              stepSize: 10,
+              font: {
+                size: 11,
+              },
+            },
+          },
+        },
+        interaction: {
           mode: "index",
           intersect: false,
-          backgroundColor: "rgba(0, 0, 0, 0.8)",
-          padding: 12,
-          titleFont: {
-            size: 14,
-            weight: "bold",
-          },
-          bodyFont: {
-            size: 12,
-          },
         },
       },
-      scales: {
-        x: {
-          grid: {
-            display: true,
-            color: "rgba(0, 0, 0, 0.05)",
-            drawBorder: false,
-          },
-          ticks: {
-            font: {
-              size: 11,
-            },
-          },
-        },
-        y: {
-          beginAtZero: true,
-          max: 100,
-          grid: {
-            display: true,
-            color: "rgba(0, 0, 0, 0.05)",
-            drawBorder: false,
-          },
-          ticks: {
-            stepSize: 10,
-            font: {
-              size: 11,
-            },
-          },
-        },
-      },
-      interaction: {
-        mode: "index",
-        intersect: false,
-      },
-    },
-  });
+    });
+
+  } catch (error) {
+    console.error('Error rendering dashboard charts:', error);
+  }
 }
 
-function populateQuickFilters() {
+async function populateQuickFilters() {
   const filterRole = document.querySelector("#filterRole");
   const filterDept = document.querySelector("#filterDept");
   const filterDate = document.querySelector("#filterDate");
@@ -470,10 +278,26 @@ function populateQuickFilters() {
 
   if (!filterRole || !filterDept || !filterDate || !pill) return;
 
-  // TODO: Replace with API call
-  // const headers = { 'Authorization': `Bearer ${sessionStorage.getItem('companyAuthToken')}` };
-  // const jds = await fetch('/api/jds', { headers }).then(r => r.json());
-  const jds = getStoredData(STORAGE_KEYS.jds) || [];
+  const token = sessionStorage.getItem('companyAuthToken');
+  let jds = [];
+
+  if (token) {
+    try {
+      const response = await fetch(API.company.jds.getAll, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        jds = await response.json();
+      }
+    } catch (error) {
+      console.error('Failed to fetch JDs for filters:', error);
+    }
+  }
+
+  // Fallback to local storage if API fails or returns empty (optional, depending on migration strategy)
+  if (!jds.length) {
+    jds = getStoredData(STORAGE_KEYS.jds) || [];
+  }
 
   const uniqueRoles = [...new Set(jds.map((jd) => jd.title))];
   filterRole.innerHTML = `<option value="all">All Roles</option>${uniqueRoles
@@ -486,36 +310,60 @@ function populateQuickFilters() {
     .join("")} `;
 
   filterDate.innerHTML = `
-    <option value="all">Any time</option>
+    <option value="all" selected>Any time</option>
     <option value="7">Last 7 days</option>
     <option value="30">Last 30 days</option>
     <option value="90">Last 90 days</option>
   `;
 
-  const applyFilters = () => {
-    // TODO: Replace with API call with query params
-    // const params = new URLSearchParams({
-    //   role: filterRole.value,
-    //   department: filterDept.value,
-    //   days: filterDate.value
-    // });
-    // const candidates = await fetch(`/api/candidates?${params}`, { headers })
-    //   .then(r => r.json());
-
-    const candidates = getStoredData(STORAGE_KEYS.candidates) || [];
+  const applyFilters = async () => {
     const selectedRole = filterRole.value;
     const selectedDept = filterDept.value;
-    const selectedDate = parseInt(filterDate.value, 10);
+    const selectedDate = filterDate.value;
 
+    // Fetch candidates from API with match data
+    let candidates = [];
+    if (token) {
+      try {
+        const params = new URLSearchParams();
+        if (selectedRole !== 'all') params.append('role', selectedRole);
+        if (selectedDept !== 'all') params.append('department', selectedDept);
+        if (selectedDate !== 'all') params.append('days', selectedDate);
+
+        const response = await fetch(`${API.company.candidates.getAll}?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          candidates = await response.json();
+        }
+      } catch (error) {
+        console.error('Failed to fetch candidates for filters:', error);
+      }
+    }
+
+    // Fallback to localStorage if API fails
+    if (!candidates.length) {
+      candidates = getStoredData(STORAGE_KEYS.candidates) || [];
+    }
+
+    // Filter candidates based on selections
     const filtered = candidates.filter((candidate) => {
       const matchesRole =
-        selectedRole === "all" || candidate.matches?.jdTitle === selectedRole;
-      const jd = jds.find((item) => item.id === candidate.matches?.jdId);
-      const matchesDept = selectedDept === "all" || jd?.department === selectedDept;
+        selectedRole === "all" ||
+        candidate.role === selectedRole ||
+        candidate.matches?.jdTitle === selectedRole;
+
+      const jd = jds.find((item) => item.id === candidate.matches?.jd_id);
+      const matchesDept = selectedDept === "all" ||
+        candidate.department === selectedDept ||
+        jd?.department === selectedDept;
+
       const matchesDate =
-        filterDate.value === "all" ||
-        (candidate.uploadedAt &&
-          Date.now() - new Date(candidate.uploadedAt).getTime() < selectedDate * 86400000);
+        selectedDate === "all" ||
+        (candidate.uploaded_at &&
+          Date.now() - new Date(candidate.uploaded_at).getTime() < parseInt(selectedDate) * 86400000);
+
       return matchesRole && matchesDept && matchesDate;
     });
 
@@ -611,6 +459,80 @@ window.notifyDataUpdate = function () {
 
 /**
  * ============================================================================
+ * BENCHMARKS TAB - Render dynamic benchmarks from backend
+ * ============================================================================
+ */
+async function renderBenchmarks() {
+  const token = sessionStorage.getItem('companyAuthToken');
+  if (!token) {
+    console.error('No auth token found');
+    return;
+  }
+
+  try {
+    const response = await fetch(API.company.dashboard.benchmarks, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+      throw new Error('Failed to fetch benchmarks');
+    }
+
+    const data = await response.json();
+
+    // Update Match Score
+    const matchScore = data.match_score;
+    document.getElementById('benchmarkMatchScore').textContent = `${matchScore.company_value}%`;
+    document.getElementById('benchmarkMatchIndustry').textContent = `Industry average: ${matchScore.industry_average}%`;
+
+    // Update Time to Hire
+    const timeToHire = data.time_to_hire;
+    document.getElementById('benchmarkTimeToHire').textContent = `${timeToHire.company_value} days`;
+    document.getElementById('benchmarkTimeIndustry').textContent = `Industry average: ${timeToHire.industry_average} days`;
+
+    // Update Conversion Rate
+    const conversionRate = data.conversion_rate;
+    document.getElementById('benchmarkConversionRate').textContent = `${conversionRate.company_value}%`;
+    document.getElementById('benchmarkConversionIndustry').textContent = `Industry average: ${conversionRate.industry_average}%`;
+
+    // Update Quality Score
+    const qualityScore = data.quality_score;
+    document.getElementById('benchmarkQualityScore').textContent = `${qualityScore.company_value}/10`;
+    document.getElementById('benchmarkQualityIndustry').textContent = `Industry average: ${qualityScore.industry_average}/10`;
+
+    // Update trend indicators based on performance
+    updateTrendIndicator('benchmarkMatchTrend', matchScore.percentage_diff, 'Your average match score');
+    updateTrendIndicator('benchmarkTimeTrend', -timeToHire.percentage_diff, 'Average processing time'); // Negative because lower is better
+    updateTrendIndicator('benchmarkConversionTrend', conversionRate.percentage_diff, 'Resume to shortlist');
+    updateTrendIndicator('benchmarkQualityTrend', qualityScore.percentage_diff, 'Candidate quality rating');
+
+  } catch (error) {
+    console.error('Error rendering benchmarks:', error);
+  }
+}
+
+function updateTrendIndicator(elementId, percentDiff, baseText) {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+
+  if (percentDiff > 0) {
+    element.className = 'trend positive';
+    element.textContent = `${baseText} (+${percentDiff.toFixed(1)}%)`;
+  } else if (percentDiff < 0) {
+    element.className = 'trend negative';
+    element.textContent = `${baseText} (${percentDiff.toFixed(1)}%)`;
+  } else {
+    element.className = 'trend';
+    element.textContent = baseText;
+  }
+}
+
+/**
+ * ============================================================================
  * TAB BUTTON FUNCTIONALITY - Handle Overview, Benchmarks, Reports tabs
  * ============================================================================
  */
@@ -642,9 +564,358 @@ function initializeTabButtons() {
         targetContent.classList.add('active');
       }
 
+      // Load data when switching to specific tabs
+      if (tabName === 'benchmarks') {
+        renderBenchmarks();
+      } else if (tabName === 'reports') {
+        // Reports tab is already initialized with event listeners
+      }
+
       console.log(`Switched to ${tabName} tab`);
     });
   });
+}
+
+/**
+ * ============================================================================
+ * REPORTS TAB - Report generation and export functionality
+ * ============================================================================
+ */
+async function updateReportSummary(saveToHistory = false) {
+  const reportType = document.getElementById('reportType')?.value || 'summary';
+  const dateRange = document.getElementById('reportDateRange')?.value || '7';
+
+  const token = sessionStorage.getItem('companyAuthToken');
+  if (!token) {
+    console.error('No auth token found');
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      report_type: reportType,
+      date_range: dateRange
+    });
+
+    const response = await fetch(`${API.company.dashboard.reportSummary}?${params}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        logout();
+        return null;
+      }
+      throw new Error('Failed to fetch report summary');
+    }
+
+    const data = await response.json();
+
+    // Update report summary
+    document.getElementById('reportTotalResumes').textContent = data.total_resumes;
+    document.getElementById('reportShortlisted').textContent = data.shortlisted;
+    document.getElementById('reportAvgScore').textContent = data.avg_score;
+    document.getElementById('reportTopDept').textContent = data.top_department || 'N/A';
+    document.getElementById('reportTopSkill').textContent = data.top_skill || 'N/A';
+
+    // Save to history if requested
+    if (saveToHistory) {
+      await saveReportToHistory(reportType, dateRange, data);
+    }
+
+    console.log('Report summary updated:', data);
+    return data;
+  } catch (error) {
+    console.error('Error updating report summary:', error);
+    return null;
+  }
+}
+
+async function saveReportToHistory(reportType, dateRange, reportData) {
+  const token = sessionStorage.getItem('companyAuthToken');
+  if (!token) return;
+
+  try {
+    const reportName = `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report - ${new Date().toLocaleDateString()}`;
+
+    console.log('Saving report to history:', { reportType, dateRange, reportData });
+
+    const response = await fetch(API.company.dashboard.reportHistory, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        report_name: reportName,
+        report_type: reportType,
+        date_range: dateRange,
+        report_data: reportData ? JSON.stringify(reportData) : null
+      })
+    });
+
+    if (response.ok) {
+      const savedReport = await response.json();
+      console.log('Report saved to history:', savedReport);
+      await loadReportHistory(); // Refresh the history table
+    } else {
+      const error = await response.text();
+      console.error('Failed to save report:', error);
+    }
+  } catch (error) {
+    console.error('Error saving report to history:', error);
+  }
+}
+
+async function loadReportHistory() {
+  const token = sessionStorage.getItem('companyAuthToken');
+  if (!token) return;
+
+  try {
+    const response = await fetch(API.company.dashboard.reportHistory, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch report history');
+    }
+
+    const reports = await response.json();
+
+    // Store report data in a global map for easy access
+    window.reportDataMap = new Map();
+    reports.forEach(report => {
+      console.log('Processing report:', report.id, 'data:', report.report_data);
+      if (report.report_data) {
+        try {
+          let parsedData = JSON.parse(report.report_data);
+
+          // Handle double-stringified data (backward compatibility)
+          if (typeof parsedData === 'string') {
+            console.log('Data is double-stringified, parsing again');
+            parsedData = JSON.parse(parsedData);
+          }
+
+          console.log('Parsed report data:', parsedData);
+          window.reportDataMap.set(report.id, parsedData);
+        } catch (e) {
+          console.error('Error parsing report data for report', report.id, e);
+        }
+      } else {
+        console.warn('No report_data for report:', report.id);
+      }
+    });
+
+    console.log('Report data map size:', window.reportDataMap.size);
+
+    // Update the report history table
+    const tbody = document.getElementById('reportHistoryTableBody');
+    if (!tbody) return;
+
+    if (reports.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="padding: 12px; text-align: center;">No reports generated yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = reports.map(report => `
+      <tr>
+        <td style="padding: 12px;">${report.report_name}</td>
+        <td style="padding: 12px;">${new Date(report.generated_at).toLocaleDateString()}</td>
+        <td style="padding: 12px;">${report.report_type.charAt(0).toUpperCase() + report.report_type.slice(1)}</td>
+        <td style="padding: 12px;">
+          <button class="btn-link" data-report-id="${report.id}" data-action="view">View</button> |
+          <button class="btn-link" data-report-id="${report.id}" data-action="download" data-report-type="${report.report_type}" data-date-range="${report.date_range}">Download</button>
+        </td>
+      </tr>
+    `).join('');
+
+    console.log('Report history loaded:', reports.length, 'reports');
+  } catch (error) {
+    console.error('Error loading report history:', error);
+  }
+}
+
+function initializeReportsTab() {
+  const generateBtn = document.getElementById('generateReport');
+  const exportBtn = document.getElementById('exportReport');
+  const reportTypeSelect = document.getElementById('reportType');
+  const reportDateRangeSelect = document.getElementById('reportDateRange');
+
+  // Generate Report button
+  if (generateBtn) {
+    generateBtn.addEventListener('click', async () => {
+      console.log('Generating report...');
+      await updateReportSummary(true); // Save to history
+    });
+  }
+
+  // Export PDF button
+  if (exportBtn) {
+    exportBtn.addEventListener('click', async () => {
+      const reportType = document.getElementById('reportType')?.value || 'summary';
+      const dateRange = document.getElementById('reportDateRange')?.value || '7';
+
+      const token = sessionStorage.getItem('companyAuthToken');
+      if (!token) {
+        console.error('No auth token found');
+        alert('Please log in to export reports');
+        return;
+      }
+
+      try {
+        console.log('Generating PDF report...');
+
+        const params = new URLSearchParams({
+          report_type: reportType,
+          date_range: dateRange
+        });
+
+        const response = await fetch(`${API.company.dashboard.exportPDF}?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            return;
+          }
+          throw new Error('Failed to generate PDF');
+        }
+
+        // Get the PDF blob
+        const blob = await response.blob();
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `hr_analytics_report_${reportType}_${dateRange}days.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        console.log('PDF report downloaded successfully');
+      } catch (error) {
+        console.error('Error exporting PDF:', error);
+        alert('Failed to export PDF. Please try again.');
+      }
+    });
+  }
+
+  // Report action buttons
+  const reportActions = {
+    'viewAnalyticsReport': () => console.log('Viewing Analytics Report'),
+    'viewTrendsReport': () => console.log('Viewing Trends Report'),
+    'viewDepartmentReport': () => console.log('Viewing Department Report'),
+    'viewCandidateReport': () => console.log('Viewing Candidate Report'),
+    'downloadCSVExport': () => downloadCSVReport()
+  };
+
+  Object.entries(reportActions).forEach(([id, handler]) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', handler);
+    }
+  });
+
+  // Report history view/download buttons - using event delegation on tbody
+  const reportHistoryTbody = document.getElementById('reportHistoryTableBody');
+  if (reportHistoryTbody) {
+    reportHistoryTbody.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('btn-link')) {
+        const action = e.target.dataset.action;
+        const reportId = e.target.dataset.reportId;
+
+        if (action === 'view') {
+          // Get report data from the map
+          const data = window.reportDataMap?.get(reportId);
+
+          if (data) {
+            try {
+              document.getElementById('reportTotalResumes').textContent = data.total_resumes || 0;
+              document.getElementById('reportShortlisted').textContent = data.shortlisted || 0;
+              document.getElementById('reportAvgScore').textContent = data.avg_score || 0;
+              document.getElementById('reportTopDept').textContent = data.top_department || 'N/A';
+              document.getElementById('reportTopSkill').textContent = data.top_skill || 'N/A';
+              console.log('Loaded report from history:', data);
+            } catch (error) {
+              console.error('Error displaying report data:', error);
+              alert('Failed to load report data');
+            }
+          } else {
+            console.error('No report data found for ID:', reportId);
+            alert('Report data not available');
+          }
+        } else if (action === 'download') {
+          // Download the report as PDF
+          const reportType = e.target.dataset.reportType;
+          const dateRange = e.target.dataset.dateRange;
+
+          const token = sessionStorage.getItem('companyAuthToken');
+          if (!token) {
+            alert('Please log in to download reports');
+            return;
+          }
+
+          try {
+            const params = new URLSearchParams({
+              report_type: reportType,
+              date_range: dateRange
+            });
+
+            const response = await fetch(`${API.company.dashboard.exportPDF}?${params}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `hr_analytics_report_${reportType}_${dateRange}days.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(url);
+              console.log('Report downloaded from history');
+            } else {
+              throw new Error('Failed to download report');
+            }
+          } catch (error) {
+            console.error('Error downloading report:', error);
+            alert('Failed to download report');
+          }
+        }
+      }
+    });
+  }
+
+  // Load report history on initialization
+  loadReportHistory();
+
+  // Auto-load default report (last 7 days summary) on initialization
+  updateReportSummary(false); // Don't save to history on auto-load
+}
+
+function downloadCSVReport() {
+  const reportType = document.getElementById('reportType')?.value || 'summary';
+  const dateRange = document.getElementById('reportDateRange')?.value || '7';
+
+  // Create CSV content (simplified example)
+  const csvContent = `Report Type,Date Range,Total Resumes,Shortlisted,Avg Score
+${reportType},${dateRange},${document.getElementById('reportTotalResumes').textContent},${document.getElementById('reportShortlisted').textContent},${document.getElementById('reportAvgScore').textContent}`;
+
+  // Create download link
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `report_${reportType}_${dateRange}days.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+
+  console.log('CSV report downloaded');
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -653,4 +924,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDashboardCharts();
   populateQuickFilters();
   initializeTabButtons();
+  initializeReportsTab();
 });

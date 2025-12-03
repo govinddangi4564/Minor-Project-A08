@@ -16,11 +16,15 @@ class UserLoginSchema(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    token: str
+
+
 class UserResponseSchema(BaseModel):
     token: str
     refresh_token: str
     user_id: UUID
-    fullName: str
+    fullName: str | None = None
     email: EmailStr
     phone: str | None = None
     newsletter: bool | None = None

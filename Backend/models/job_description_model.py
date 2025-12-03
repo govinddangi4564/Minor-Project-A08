@@ -22,10 +22,11 @@ class JobDescription(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
 
     # Optional relationships
     candidate_matches = relationship("CandidateMatch", back_populates="job_description")
     shortlists = relationship("Shortlist", back_populates="job_description")
     company = relationship("Company", back_populates="job_description")
+    user = relationship("UserModel", back_populates="job_description")
